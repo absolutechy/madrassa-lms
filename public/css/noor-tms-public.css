@@ -1,0 +1,1060 @@
+/*
+ * Noor-TMS – Front-End Portal Styles
+ * All rules scoped to .noor-tms-app or .noor-tms-login-wrap to avoid
+ * conflicting with the active WordPress theme.
+ */
+
+/* =========================================================================
+   CSS Custom Properties
+   ========================================================================= */
+:root {
+	--tms-primary:       #1e3a5f;
+	--tms-primary-dark:  #152c47;
+	--tms-accent:        #25a05c;
+	--tms-accent-hover:  #1e8a4e;
+	--tms-danger:        #dc3545;
+	--tms-warn:          #e6a817;
+	--tms-pass:          #25a05c;
+	--tms-fail:          #dc3545;
+	--tms-bg:            #f0f4f9;
+	--tms-card:          #ffffff;
+	--tms-border:        #dde3ed;
+	--tms-text:          #1a202c;
+	--tms-muted:         #64748b;
+	--tms-nav-width:     220px;
+	--tms-radius:        10px;
+	--tms-shadow:        0 2px 12px rgba(30,58,95,.10);
+	--tms-shadow-hover:  0 6px 24px rgba(30,58,95,.18);
+	--tms-transition:    all .2s ease;
+}
+
+/* =========================================================================
+   Login Page
+   ========================================================================= */
+
+.noor-tms-login-wrap {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 60vh;
+	padding: 40px 16px;
+}
+
+.noor-login-card {
+	background: var(--tms-card);
+	border-radius: var(--tms-radius);
+	box-shadow: var(--tms-shadow-hover);
+	width: 100%;
+	max-width: 420px;
+	padding: 40px 36px 36px;
+}
+
+.noor-login-card__logo {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 28px;
+}
+
+.noor-login-card__logo .noor-logo-icon {
+	width: 44px;
+	height: 44px;
+	background: var(--tms-primary);
+	border-radius: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	font-size: 22px;
+	flex-shrink: 0;
+}
+
+.noor-login-card__logo h1 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 700;
+	color: var(--tms-primary);
+	line-height: 1.2;
+}
+
+.noor-login-card__logo p {
+	margin: 2px 0 0;
+	font-size: 12px;
+	color: var(--tms-muted);
+}
+
+.noor-login-card h2 {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--tms-text);
+	margin: 0 0 24px;
+}
+
+/* Override WP default login form styles */
+.noor-login-card .login-username,
+.noor-login-card .login-password,
+.noor-login-card .login-remember {
+	margin-bottom: 16px;
+}
+
+.noor-login-card label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--tms-text);
+	margin-bottom: 6px;
+}
+
+.noor-login-card input[type="text"],
+.noor-login-card input[type="password"] {
+	width: 100%;
+	padding: 10px 14px;
+	border: 1.5px solid var(--tms-border);
+	border-radius: 8px;
+	font-size: 14px;
+	color: var(--tms-text);
+	background: #fafbfd;
+	transition: var(--tms-transition);
+	box-sizing: border-box;
+}
+
+.noor-login-card input[type="text"]:focus,
+.noor-login-card input[type="password"]:focus {
+	outline: none;
+	border-color: var(--tms-primary);
+	box-shadow: 0 0 0 3px rgba(30,58,95,.12);
+	background: #fff;
+}
+
+.noor-login-card input[type="submit"],
+.noor-login-card .wp-block-button__link {
+	width: 100%;
+	padding: 12px;
+	background: var(--tms-primary);
+	color: #fff !important;
+	border: none;
+	border-radius: 8px;
+	font-size: 15px;
+	font-weight: 600;
+	cursor: pointer;
+	letter-spacing: .3px;
+	transition: var(--tms-transition);
+	margin-top: 8px;
+}
+
+.noor-login-card input[type="submit"]:hover {
+	background: var(--tms-primary-dark);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(30,58,95,.25);
+}
+
+.noor-login-error {
+	background: #fef2f2;
+	border-left: 4px solid var(--tms-danger);
+	color: var(--tms-danger);
+	padding: 10px 14px;
+	border-radius: 6px;
+	font-size: 14px;
+	margin-top: 16px;
+}
+
+/* =========================================================================
+   App Shell  (all pages except login)
+   ========================================================================= */
+
+.noor-tms-app {
+	display: flex;
+	min-height: 100vh;
+	background: var(--tms-bg);
+	/*border-radius: var(--tms-radius);*/
+	overflow: hidden;
+	box-shadow: var(--tms-shadow);
+}
+
+/* ── Sidebar ── */
+.noor-tms-sidebar {
+	width: var(--tms-nav-width);
+	min-width: var(--tms-nav-width);
+	background: var(--tms-primary);
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+}
+
+.noor-tms-sidebar__brand {
+	padding: 22px 20px 18px;
+	border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.noor-tms-sidebar__brand h2 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #fff;
+	letter-spacing: .4px;
+}
+
+.noor-tms-sidebar__brand span {
+	display: block;
+	font-size: 10px;
+	color: rgba(255,255,255,.55);
+	margin-top: 2px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+}
+
+.noor-tms-nav {
+	list-style: none;
+	margin: 12px 0 0;
+	padding: 0;
+	flex: 1;
+}
+
+.noor-tms-nav li a {
+	display: flex;
+	align-items: flex-end;
+	gap: 10px;
+	padding: 11px 20px;
+	font-size: 13.5px;
+	font-weight: 500;
+	color: rgba(255,255,255,.75);
+	text-decoration: none;
+	transition: var(--tms-transition);
+	border-left: 3px solid transparent;
+}
+
+.noor-tms-nav li a:hover,
+.noor-tms-nav li a.is-active {
+	color: #fff;
+	background: rgba(255,255,255,.10);
+	border-left-color: var(--tms-accent);
+}
+
+.noor-tms-nav li a .nav-icon {
+	font-size: 16px;
+	opacity: .85;
+}
+
+.noor-tms-sidebar__footer {
+	padding: 16px 20px;
+	border-top: 1px solid rgba(255,255,255,.12);
+	font-size: 12px;
+	color: rgba(255,255,255,.45);
+}
+
+.noor-tms-sidebar__footer a {
+	color: rgba(255,255,255,.6);
+	text-decoration: none;
+}
+
+.noor-tms-sidebar__footer a:hover {
+	color: #fff;
+}
+
+/* ── Main Content ── */
+.noor-tms-main {
+	flex: 1;
+	overflow-x: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+.noor-tms-topbar {
+	background: var(--tms-card);
+	border-bottom: 1px solid var(--tms-border);
+	padding: 14px 28px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.noor-tms-topbar h1 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 700;
+	color: var(--tms-text);
+}
+
+.noor-tms-topbar__actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.noor-tms-content {
+	padding: 28px;
+	flex: 1;
+}
+
+/* =========================================================================
+   Notices / Alerts
+   ========================================================================= */
+
+.noor-notice {
+	padding: 12px 16px;
+	border-radius: 8px;
+	font-size: 14px;
+	margin-bottom: 20px;
+	border-left: 4px solid;
+}
+
+.noor-notice--success {
+	background: #f0fdf4;
+	border-color: var(--tms-accent);
+	color: #166534;
+}
+
+.noor-notice--warning {
+	background: #fffbeb;
+	border-color: var(--tms-warn);
+	color: #92400e;
+}
+
+.noor-notice--error {
+	background: #fef2f2;
+	border-color: var(--tms-danger);
+	color: #991b1b;
+}
+
+/* =========================================================================
+   Cards
+   ========================================================================= */
+
+.noor-card {
+	background: var(--tms-card);
+	border: 1px solid var(--tms-border);
+	border-radius: var(--tms-radius);
+	box-shadow: var(--tms-shadow);
+	padding: 24px;
+	margin-bottom: 24px;
+}
+
+.noor-card h2 {
+	margin: 0 0 18px;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--tms-text);
+	padding-bottom: 14px;
+	border-bottom: 1px solid var(--tms-border);
+}
+
+.noor-card h3 {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--tms-text);
+	margin: 20px 0 12px;
+}
+
+/* =========================================================================
+   Filter / Search Bar
+   ========================================================================= */
+
+.noor-filter-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 20px;
+}
+
+.noor-filter-row input[type="search"],
+.noor-filter-row select {
+	padding: 9px 14px;
+	border: 1.5px solid var(--tms-border);
+	border-radius: 8px;
+	font-size: 13px;
+	color: var(--tms-text);
+	background: var(--tms-card);
+	min-width: 140px;
+	transition: var(--tms-transition);
+}
+
+.noor-filter-row input[type="search"]:focus,
+.noor-filter-row select:focus {
+	outline: none;
+	border-color: var(--tms-primary);
+	box-shadow: 0 0 0 3px rgba(30,58,95,.10);
+}
+
+/* =========================================================================
+   Buttons
+   ========================================================================= */
+
+.noor-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 9px 18px;
+	border-radius: 8px;
+	font-size: 13.5px;
+	font-weight: 600;
+	cursor: pointer;
+	border: 1.5px solid transparent;
+	text-decoration: none;
+	transition: var(--tms-transition);
+	line-height: 1;
+}
+
+.noor-btn--primary {
+	background: var(--tms-primary);
+	color: #fff;
+	border-color: var(--tms-primary);
+}
+
+.noor-btn--primary:hover {
+	background: var(--tms-primary-dark);
+	border-color: var(--tms-primary-dark);
+	color: #fff;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 10px rgba(30,58,95,.22);
+}
+
+.noor-btn--secondary {
+	background: var(--tms-card);
+	color: var(--tms-text);
+	border-color: var(--tms-border);
+}
+
+.noor-btn--secondary:hover {
+	border-color: var(--tms-primary);
+	color: var(--tms-primary);
+	background: #f0f4f9;
+}
+
+.noor-btn--danger {
+	background: transparent;
+	color: var(--tms-danger);
+	border-color: var(--tms-danger);
+}
+
+.noor-btn--danger:hover {
+	background: var(--tms-danger);
+	color: #fff;
+}
+
+.noor-btn--success {
+	background: var(--tms-accent);
+	color: #fff;
+	border-color: var(--tms-accent);
+}
+
+.noor-btn--success:hover {
+	background: var(--tms-accent-hover);
+	border-color: var(--tms-accent-hover);
+	color: #fff;
+}
+
+.noor-btn--sm {
+	padding: 5px 12px;
+	font-size: 12.5px;
+}
+
+.noor-btn:disabled,
+.noor-btn[disabled] {
+	opacity: .55;
+	cursor: not-allowed;
+	transform: none !important;
+	box-shadow: none !important;
+}
+
+/* =========================================================================
+   Tables
+   ========================================================================= */
+
+.noor-table-wrap {
+	overflow-x: auto;
+	border-radius: var(--tms-radius);
+	border: 1px solid var(--tms-border);
+}
+
+.noor-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13.5px;
+	background: var(--tms-card);
+}
+
+.noor-table thead {
+	background: #f8fafc;
+}
+
+.noor-table thead th {
+	padding: 12px 16px;
+	text-align: start;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	color: var(--tms-muted);
+	border-bottom: 1px solid var(--tms-border);
+	white-space: nowrap;
+}
+
+.noor-table tbody td {
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--tms-border);
+	color: var(--tms-text);
+	vertical-align: middle;
+}
+
+.noor-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.noor-table tbody tr:hover td {
+	background: #f8fafc;
+}
+
+.noor-table td.noor-actions {
+	white-space: nowrap;
+}
+
+.noor-table td .noor-btn + .noor-btn {
+	margin-left: 6px;
+}
+
+/* Pagination */
+.noor-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	margin-top: 16px;
+}
+
+.noor-pagination .page-numbers {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 8px;
+	border: 1.5px solid var(--tms-border);
+	background: var(--tms-card);
+	font-size: 13px;
+	color: var(--tms-text);
+	text-decoration: none;
+	transition: var(--tms-transition);
+}
+
+.noor-pagination .page-numbers.current,
+.noor-pagination .page-numbers:hover {
+	background: var(--tms-primary);
+	border-color: var(--tms-primary);
+	color: #fff;
+}
+
+/* =========================================================================
+   Status Badges
+   ========================================================================= */
+
+.noor-badge {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 20px;
+	font-size: 11.5px;
+	font-weight: 600;
+	letter-spacing: .3px;
+}
+
+.noor-badge--active {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.noor-badge--inactive {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+.noor-badge--graduated {
+	background: #e0f2fe;
+	color: #0369a1;
+}
+
+/* =========================================================================
+   Forms
+   ========================================================================= */
+
+.noor-form-group {
+	margin-bottom: 20px;
+}
+
+.noor-form-group label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--tms-text);
+	margin-bottom: 6px;
+}
+
+.noor-form-group label .required {
+	color: var(--tms-danger);
+	margin-left: 2px;
+}
+
+.noor-form-group input[type="text"],
+.noor-form-group input[type="tel"],
+.noor-form-group input[type="date"],
+.noor-form-group input[type="number"],
+.noor-form-group input[type="password"],
+.noor-form-group select,
+.noor-form-group textarea {
+	width: 100%;
+	padding: 10px 14px;
+	border: 1.5px solid var(--tms-border);
+	border-radius: 8px;
+	font-size: 14px;
+	color: var(--tms-text);
+	background: #fafbfd;
+	transition: var(--tms-transition);
+	box-sizing: border-box;
+	font-family: inherit;
+}
+
+.noor-form-group input:focus,
+.noor-form-group select:focus,
+.noor-form-group textarea:focus {
+	outline: none;
+	border-color: var(--tms-primary);
+	box-shadow: 0 0 0 3px rgba(30,58,95,.10);
+	background: #fff;
+}
+
+.noor-form-group textarea {
+	resize: vertical;
+	min-height: 100px;
+}
+
+.noor-form-description {
+	font-size: 12px;
+	color: var(--tms-muted);
+	margin-top: 5px;
+}
+
+.noor-form-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+}
+
+.noor-form-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--tms-border);
+	margin-top: 24px;
+}
+
+/* =========================================================================
+   Subject rows (class form)
+   ========================================================================= */
+
+.noor-subject-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.noor-subject-row input {
+	flex: 1;
+	padding: 9px 12px;
+	border: 1.5px solid var(--tms-border);
+	border-radius: 8px;
+	font-size: 13.5px;
+	background: #fafbfd;
+	transition: var(--tms-transition);
+}
+
+.noor-subject-row input:focus {
+	outline: none;
+	border-color: var(--tms-primary);
+	background: #fff;
+	box-shadow: 0 0 0 3px rgba(30,58,95,.10);
+}
+
+/* =========================================================================
+   Class Cards Grid
+   ========================================================================= */
+
+.noor-class-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 20px;
+}
+
+.noor-class-card {
+	background: var(--tms-card);
+	border: 1px solid var(--tms-border);
+	border-radius: var(--tms-radius);
+	box-shadow: var(--tms-shadow);
+	padding: 20px;
+	transition: var(--tms-transition);
+	text-decoration: none;
+	display: block;
+	color: var(--tms-text);
+}
+
+.noor-class-card:hover {
+	box-shadow: var(--tms-shadow-hover);
+	transform: translateY(-2px);
+	border-color: #c4cfe0;
+}
+
+.noor-class-card__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 12px;
+}
+
+.noor-class-card__name {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--tms-primary);
+	margin: 0;
+}
+
+.noor-class-card__meta {
+	font-size: 11.5px;
+	color: var(--tms-muted);
+	background: #f0f4f9;
+	padding: 3px 8px;
+	border-radius: 20px;
+	white-space: nowrap;
+}
+
+.noor-subject-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	list-style: none;
+	margin: 0 0 14px;
+	padding: 0;
+}
+
+.noor-subject-tag {
+	background: #e0e7ff;
+	color: #3730a3;
+	border-radius: 20px;
+	padding: 3px 10px;
+	font-size: 11.5px;
+	font-weight: 500;
+}
+
+.noor-class-card__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px solid var(--tms-border);
+}
+
+/* Link-style class card (results overview) */
+.noor-class-card--link {
+	cursor: pointer;
+}
+
+.noor-class-card--link .noor-class-card__cta {
+	font-size: 13px;
+	color: var(--tms-accent);
+	font-weight: 600;
+	display: block;
+	margin-top: 10px;
+}
+
+/* =========================================================================
+   Results – marks entry table
+   ========================================================================= */
+
+.noor-marks-table {
+	width: 100%;
+	max-width: 580px;
+	border-collapse: collapse;
+	margin-top: 12px;
+}
+
+.noor-marks-table thead th {
+	padding: 10px 12px;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: var(--tms-muted);
+	border-bottom: 2px solid var(--tms-border);
+	text-align: start;
+}
+
+.noor-marks-table tbody td {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--tms-border);
+	vertical-align: middle;
+}
+
+.noor-marks-table input[type="number"] {
+	width: 80px;
+	padding: 7px 10px;
+	border: 1.5px solid var(--tms-border);
+	border-radius: 6px;
+	font-size: 13.5px;
+	text-align: center;
+	background: #fafbfd;
+	transition: var(--tms-transition);
+}
+
+.noor-marks-table input[type="number"]:focus {
+	outline: none;
+	border-color: var(--tms-primary);
+	box-shadow: 0 0 0 3px rgba(30,58,95,.10);
+	background: #fff;
+}
+
+/* =========================================================================
+   Percentage / Pass-Fail labels
+   ========================================================================= */
+
+.noor-pct {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.noor-pct--pass {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.noor-pct--fail {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+/* =========================================================================
+   AJAX feedback
+   ========================================================================= */
+
+.noor-ajax-feedback {
+	font-size: 13.5px;
+	font-weight: 600;
+	padding: 6px 0;
+}
+
+.noor-ajax-feedback.is-success { color: var(--tms-accent); }
+.noor-ajax-feedback.is-error   { color: var(--tms-danger);  }
+
+/* =========================================================================
+   WhatsApp button
+   ========================================================================= */
+
+.noor-btn--whatsapp {
+	background: #25D366;
+	color: #fff;
+	border-color: #25D366;
+}
+
+.noor-btn--whatsapp:hover {
+	background: #1ebe59;
+	border-color: #1ebe59;
+	color: #fff;
+}
+
+/* =========================================================================
+   Breadcrumb
+   ========================================================================= */
+
+.noor-breadcrumb {
+	font-size: 13px;
+	margin: 0 0 12px;
+}
+
+.noor-breadcrumb a {
+	color: var(--tms-primary);
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.noor-breadcrumb a:hover {
+	text-decoration: underline;
+}
+
+/* =========================================================================
+   Settings – provider rows toggle
+   ========================================================================= */
+
+.noor-settings-table {
+	width: 100%;
+}
+
+.noor-settings-table th {
+	width: 220px;
+	padding: 14px 16px 14px 0;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--tms-text);
+	vertical-align: top;
+}
+
+.noor-settings-table td {
+	padding: 14px 0;
+}
+
+.noor-settings-table tr + tr td,
+.noor-settings-table tr + tr th {
+	border-top: 1px solid var(--tms-border);
+}
+
+/* =========================================================================
+   Empty-state
+   ========================================================================= */
+
+.noor-empty {
+	text-align: center;
+	padding: 48px 20px;
+	color: var(--tms-muted);
+}
+
+.noor-empty .noor-empty-icon {
+	font-size: 48px;
+	display: block;
+	margin-bottom: 12px;
+	opacity: .5;
+}
+
+.noor-empty p {
+	font-size: 15px;
+	margin: 0 0 20px;
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 768px) {
+	.noor-tms-app {
+		flex-direction: column;
+	}
+
+	.noor-tms-sidebar {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.noor-tms-nav {
+		display: flex;
+		flex-wrap: wrap;
+		margin: 0;
+	}
+
+	.noor-tms-nav li a {
+		padding: 10px 14px;
+		font-size: 13px;
+		border-left: none;
+		border-bottom: 3px solid transparent;
+	}
+
+	.noor-tms-nav li a.is-active,
+	.noor-tms-nav li a:hover {
+		border-left-color: transparent;
+		border-bottom-color: var(--tms-accent);
+	}
+
+	.noor-form-row {
+		grid-template-columns: 1fr;
+	}
+
+	.noor-tms-content {
+		padding: 16px;
+	}
+
+	.noor-tms-topbar {
+		padding: 12px 16px;
+		flex-wrap: wrap;
+	}
+}
+/* =========================================================================
+   Attendance – Tab navigation
+   ========================================================================= */
+
+.noor-tab-wrap {
+	display: flex;
+	gap: 4px;
+	border-bottom: 2px solid var(--tms-border);
+	margin-bottom: 16px;
+}
+
+.noor-tab-link {
+	display: inline-block;
+	padding: 8px 18px;
+	border-bottom: 3px solid transparent;
+	margin-bottom: -2px;
+	text-decoration: none;
+	color: var(--tms-muted);
+	font-weight: 500;
+	transition: var(--tms-transition);
+	border-radius: 4px 4px 0 0;
+}
+
+.noor-tab-link:hover {
+	color: var(--tms-primary);
+	background: rgba(30,58,95,.04);
+}
+
+.noor-tab-link.is-active {
+	color: var(--tms-primary);
+	border-bottom-color: var(--tms-primary);
+	font-weight: 600;
+}
+
+/* =========================================================================
+   Attendance – Table row status colours
+   ========================================================================= */
+
+.noor-att-row.noor-att-absent td {
+	background: rgba(220, 53, 53, 0.07);
+}
+
+.noor-att-row.noor-att-late td {
+	background: rgba(230, 168, 23, 0.10);
+}
+
+.noor-att-row.noor-att-excused td {
+	background: rgba(13, 110, 253, 0.07);
+}
+
+/* =========================================================================
+   Attendance – Percentage badge (single-dash variant used in templates)
+   ========================================================================= */
+
+.noor-pct-pass {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 700;
+	background: #dcfce7;
+	color: #166534;
+}
+
+.noor-pct-fail {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 700;
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+/* =========================================================================
+   Attendance – Small button modifier
+   ========================================================================= */
+
+.noor-btn--small {
+	padding: 5px 12px;
+	font-size: 13px;
+}

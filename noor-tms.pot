@@ -1,0 +1,1168 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Noor-TMS – Madrasa Management System\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-10 10:20+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"Language: \n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Loco https://localise.biz/\n"
+"X-Loco-Version: 2.8.3; wp-6.9.4; php-8.3.30\n"
+"X-Domain: noor-tms"
+
+#: admin/class-noor-tms-attendance.php:240 admin/class-noor-tms-results.php:269
+#: public/templates/attendance.php:209 public/templates/results-class.php:188
+msgid "%"
+msgstr ""
+
+#. %d: records saved
+#: admin/class-noor-tms-attendance.php:345
+#: admin/class-noor-tms-teachers.php:625
+msgid "%d record saved."
+msgid_plural "%d records saved."
+msgstr[0] ""
+msgstr[1] ""
+
+#: public/templates/results-class.php:305
+msgid "%d Result"
+msgid_plural "%d Results"
+msgstr[0] ""
+msgstr[1] ""
+
+#. %d: number of subjects saved
+#: admin/class-noor-tms-results.php:548
+msgid "%d result saved."
+msgid_plural "%d results saved."
+msgstr[0] ""
+msgstr[1] ""
+
+#. %d: number of subjects
+#: admin/class-noor-tms-classes.php:84 admin/class-noor-tms-results.php:79
+#: public/templates/classes.php:46 public/templates/results.php:40
+msgid "%d subject"
+msgid_plural "%d subjects"
+msgstr[0] ""
+msgstr[1] ""
+
+#: admin/class-noor-tms-results.php:214
+msgid "0"
+msgstr ""
+
+#. Description of the plugin
+msgid ""
+"A scalable, OOP-based Madrasa Management System for student administration "
+"and automated WhatsApp parent communication."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:151
+#: admin/class-noor-tms-teachers.php:133 admin/class-noor-tms-teachers.php:196
+#: public/templates/attendance.php:110
+msgid "Absent"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:99 admin/class-noor-tms-teachers.php:257
+#: public/templates/results-class.php:193 public/templates/students.php:97
+#: public/templates/teachers.php:206
+msgid "Actions"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:77 admin/class-noor-tms-students.php:280
+#: admin/class-noor-tms-teachers.php:271 admin/class-noor-tms-teachers.php:380
+#: public/templates/student-form.php:89 public/templates/students.php:58
+#: public/templates/teachers.php:91 public/templates/teachers.php:218
+msgid "Active"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:138 public/templates/results-class.php:61
+msgid "Add a student"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:156 public/templates/class-form.php:44
+msgid "Add all subjects taught in this class."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:129 public/templates/results-class.php:26
+#: public/templates/results-class.php:35 public/templates/results-class.php:41
+#: public/templates/results-class.php:52 public/templates/results-class.php:289
+msgid "Add Exam Results"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:52
+msgid "Add New"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:56 admin/class-noor-tms-classes.php:128
+#: public/templates/class-form.php:16 public/templates/classes.php:16
+msgid "Add New Class"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:198 public/templates/student-form.php:16
+msgid "Add New Student"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:239 admin/class-noor-tms-teachers.php:304
+#: public/templates/teachers.php:22 public/templates/teachers.php:43
+msgid "Add New Teacher"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:64 admin/class-noor-tms-admin.php:65
+#: admin/class-noor-tms-students.php:312 public/templates/student-form.php:121
+#: public/templates/students.php:24
+msgid "Add Student"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:187 public/templates/class-form.php:66
+msgid "Add Subject"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:476 public/templates/teachers.php:184
+msgid "Add Teacher"
+msgstr ""
+
+#: public/templates/students.php:83
+msgid "Add the first student"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:125 public/templates/attendance.php:82
+msgid "All Absent"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:118 admin/class-noor-tms-students.php:65
+#: public/templates/results-class.php:40 public/templates/students.php:45
+msgid "All Classes"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:124 public/templates/attendance.php:79
+msgid "All Present"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:75 public/templates/students.php:55
+msgid "All Statuses"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:179
+msgid "An error occurred."
+msgstr ""
+
+#: public/class-noor-tms-public-controller.php:103
+msgid "An error occurred. Please try again."
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:91 public/templates/settings.php:67
+msgid "API Token / Auth Token"
+msgstr ""
+
+#: public/class-noor-tms-public-controller.php:104
+msgid "Are you sure you want to delete this?"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:178
+msgid "Are you sure?"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:393 public/templates/teachers.php:101
+msgid ""
+"Assign classes (homeroom) and their respective subjects to this teacher. A "
+"class/subject assigned to another teacher cannot be selected."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:110 public/templates/attendance.php:23
+#: public/templates/layout.php:33
+msgid "Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:200
+msgid "Attendance %"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:183
+#: admin/class-noor-tms-teachers.php:165
+msgid "Attendance History"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:120
+msgid ""
+"Available placeholders: {student_name}, {subject}, {marks_obtained}, "
+"{total_marks}, {exam_date}"
+msgstr ""
+
+#: public/templates/class-form.php:19
+msgid "Back to Classes"
+msgstr ""
+
+#: public/templates/results-class.php:34
+msgid "Back to Dates"
+msgstr ""
+
+#: public/templates/results-class.php:29
+msgid "Back to Results"
+msgstr ""
+
+#: public/templates/student-form.php:19
+msgid "Back to Students"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:199 admin/class-noor-tms-students.php:314
+#: admin/class-noor-tms-teachers.php:480 public/templates/class-form.php:75
+#: public/templates/student-form.php:124 public/templates/teachers.php:187
+msgid "Cancel"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:370 public/templates/teachers.php:82
+msgid "Changing the linked user will revoke the old user's teacher access."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:233 admin/class-noor-tms-students.php:95
+#: admin/class-noor-tms-students.php:224 public/templates/attendance.php:202
+#: public/templates/student-form.php:52 public/templates/students.php:93
+msgid "Class"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:392 public/templates/teachers.php:100
+msgid "Class & Subject Assignments"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:301 public/templates/classes.php:22
+msgid "Class created successfully."
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:259
+msgid "Class deleted."
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:144 public/templates/class-form.php:36
+msgid "Class Name"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:223
+#: public/class-noor-tms-public-controller.php:758
+msgid "Class name cannot be empty."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:101
+msgid "Class not found."
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:302 public/templates/classes.php:24
+msgid "Class updated successfully."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:89
+#: admin/class-noor-tms-attendance.php:191
+msgid "Class:"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:82 admin/class-noor-tms-admin.php:83
+#: admin/class-noor-tms-classes.php:54 admin/class-noor-tms-teachers.php:255
+#: public/templates/classes.php:13 public/templates/layout.php:39
+#: public/templates/teachers.php:204
+msgid "Classes"
+msgstr ""
+
+#: public/templates/settings.php:27
+msgid "Configure how WhatsApp notifications are sent to parents."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:713
+#: public/class-noor-tms-public-controller.php:535
+msgid "Could not create WP user: "
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:256
+msgid "Could not delete class."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:596
+msgid "Could not delete result."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:404
+msgid "Could not delete student."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:591
+msgid "Could not delete teacher."
+msgstr ""
+
+#: public/templates/classes.php:33 public/templates/results.php:24
+msgid "Create a Class"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:68 admin/class-noor-tms-results.php:60
+#: admin/class-noor-tms-students.php:233 public/templates/student-form.php:60
+msgid "Create a class"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:195 public/templates/class-form.php:72
+msgid "Create Class"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:101 admin/class-noor-tms-teachers.php:97
+msgid "Date:"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:110 admin/class-noor-tms-students.php:150
+#: admin/class-noor-tms-teachers.php:280 public/templates/classes.php:76
+#: public/templates/students.php:159
+msgid "Delete"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:177
+#: public/class-noor-tms-public-controller.php:102
+msgid "Deleting…"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:150
+msgid "e.g. Class Hifz 1"
+msgstr ""
+
+#: public/templates/class-form.php:39
+msgid "e.g. Hifz Class 1"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:101 admin/class-noor-tms-students.php:141
+#: admin/class-noor-tms-teachers.php:276 public/templates/classes.php:63
+#: public/templates/results-class.php:259 public/templates/students.php:146
+#: public/templates/teachers.php:221
+msgid "Edit"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:128 public/templates/class-form.php:16
+msgid "Edit Class"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:150 public/templates/results-class.php:72
+msgid "Edit class"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:198 public/templates/student-form.php:16
+msgid "Edit Student"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:304 public/templates/teachers.php:43
+msgid "Edit Teacher"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:653
+#: public/class-noor-tms-public-controller.php:476
+msgid "Email"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:704
+#: public/class-noor-tms-public-controller.php:526
+msgid "Email address already in use."
+msgstr ""
+
+#: public/templates/students.php:95
+msgid "Enrolled"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:97 admin/class-noor-tms-students.php:265
+#: public/templates/student-form.php:78
+msgid "Enrollment Date"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:43
+msgid ""
+"Enter your Ultramsg / Twilio credentials. Leave blank to disable automatic "
+"notifications."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:180 public/templates/results-class.php:96
+msgid "Exam Date"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:73 admin/class-noor-tms-admin.php:74
+#: admin/class-noor-tms-results.php:50 admin/class-noor-tms-results.php:122
+#: public/templates/results-class.php:37 public/templates/results.php:13
+msgid "Exam Results"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:151
+#: admin/class-noor-tms-teachers.php:133 admin/class-noor-tms-teachers.php:198
+#: public/templates/attendance.php:110
+msgid "Excused"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:323 public/templates/results-class.php:239
+msgid "Fail"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:403
+msgid "Failed to save result."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:87 public/templates/students.php:73
+msgid "Filter"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:214 admin/class-noor-tms-teachers.php:334
+#: public/templates/student-form.php:34 public/templates/teachers.php:54
+msgid "Full Name"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:52 public/templates/settings.php:35
+msgid "Gateway Provider"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:77 admin/class-noor-tms-students.php:280
+#: public/templates/student-form.php:91 public/templates/students.php:60
+msgid "Graduated"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:71 admin/class-noor-tms-teachers.php:81
+#: public/templates/attendance.php:40
+msgid "History"
+msgstr ""
+
+#. URI of the plugin
+msgid "https://github.com/your-org/noor-tms"
+msgstr ""
+
+#. Author URI of the plugin
+msgid "https://yoursite.com"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:93
+msgid "ID"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:77 admin/class-noor-tms-students.php:280
+#: admin/class-noor-tms-teachers.php:271 admin/class-noor-tms-teachers.php:381
+#: public/templates/student-form.php:90 public/templates/students.php:59
+#: public/templates/teachers.php:92 public/templates/teachers.php:218
+msgid "Inactive"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:80 public/templates/settings.php:60
+msgid "Instance ID / Account SID"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:28
+#: admin/class-noor-tms-attendance.php:311 admin/class-noor-tms-classes.php:25
+#: admin/class-noor-tms-results.php:30 admin/class-noor-tms-results.php:365
+#: admin/class-noor-tms-results.php:456 admin/class-noor-tms-results.php:570
+#: admin/class-noor-tms-results.php:591 admin/class-noor-tms-settings.php:25
+#: admin/class-noor-tms-settings.php:163 admin/class-noor-tms-students.php:28
+#: admin/class-noor-tms-students.php:185 admin/class-noor-tms-students.php:393
+#: admin/class-noor-tms-teachers.php:30 admin/class-noor-tms-teachers.php:54
+#: admin/class-noor-tms-teachers.php:586 admin/class-noor-tms-teachers.php:604
+#: public/class-noor-tms-public-controller.php:551
+msgid "Insufficient permissions."
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:109 public/templates/settings.php:79
+#: public/templates/student-form.php:46
+msgid "International format, e.g. +923001234567"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:260
+msgid "International format. E.g. +923001234567"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:320
+msgid "Invalid class."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:353
+#: public/class-noor-tms-public-controller.php:716
+msgid "Invalid file type. Only JPEG, PNG and WebP are allowed."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:387
+msgid "Invalid marks values."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:517
+msgid "Invalid phone format. Use international format, e.g. +923001234567"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:345
+#: public/class-noor-tms-public-controller.php:708
+msgid "Invalid phone number. Use international format, e.g. +923001234567"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:397
+msgid "Invalid student ID."
+msgstr ""
+
+#: public/templates/login.php:29
+msgid "Invalid username or password. Please try again."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:692
+#: public/class-noor-tms-public-controller.php:514
+msgid "Invalid username."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:151
+#: admin/class-noor-tms-teachers.php:133 admin/class-noor-tms-teachers.php:197
+#: public/templates/attendance.php:110
+msgid "Late"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:661
+#: public/class-noor-tms-public-controller.php:483
+msgid "Leave blank to generate a random password."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:356
+msgid "Link a WP user so they can log into the portal."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:254
+msgid "Linked WP User"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:105
+#: admin/class-noor-tms-teachers.php:100 public/templates/attendance.php:65
+msgid "Load"
+msgstr ""
+
+#: public/templates/login.php:18
+msgid "Madrasa Management System"
+msgstr ""
+
+#: public/templates/layout.php:70
+msgid "Madrasa Portal"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:67 admin/class-noor-tms-teachers.php:77
+#: public/templates/attendance.php:36
+msgid "Mark Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:81
+msgid "Mark Student Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:90
+msgid "Mark Teacher Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:196
+msgid "Marks Obtained"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:114 public/templates/settings.php:83
+msgid "Message Template"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:59 public/templates/settings.php:40
+msgid "Mock / Test Mode"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:203
+#: admin/class-noor-tms-teachers.php:172
+msgid "Month:"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:94 admin/class-noor-tms-teachers.php:252
+#: public/templates/students.php:92 public/templates/teachers.php:201
+msgid "Name"
+msgstr ""
+
+#. %s: link to add student page
+#. %s: link
+#: admin/class-noor-tms-results.php:137 public/templates/results-class.php:59
+#, php-format
+msgid "No active students in this class. %s to this class first."
+msgstr ""
+
+#: public/templates/settings.php:55
+msgid ""
+"No API keys needed. Opens WhatsApp Web with message pre-filled — just click "
+"Send."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:226 public/templates/attendance.php:189
+msgid "No attendance records for the selected period."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:189
+msgid "No attendance records for this month."
+msgstr ""
+
+#. %s: link to create class
+#: admin/class-noor-tms-results.php:59
+#, php-format
+msgid "No classes found. %s first, then add students to it."
+msgstr ""
+
+#. %s: link to create class
+#: admin/class-noor-tms-students.php:232 public/templates/student-form.php:58
+#, php-format
+msgid "No classes found. %s first."
+msgstr ""
+
+#: public/templates/results.php:22
+msgid "No classes found. Create a class and add students first."
+msgstr ""
+
+#. %s: link to create class
+#: admin/class-noor-tms-classes.php:67
+#, php-format
+msgid "No classes yet. %s to get started."
+msgstr ""
+
+#: public/templates/classes.php:31
+msgid "No classes yet. Create your first class to get started."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:334 public/templates/results-class.php:252
+msgid "No phone"
+msgstr ""
+
+#: public/templates/results-class.php:287
+msgid "No previous exams found."
+msgstr ""
+
+#: public/templates/results-class.php:162
+msgid "No results found for this date."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:345
+msgid ""
+"No results recorded for this class yet. Use the form above to add exam marks."
+msgstr ""
+
+#: public/templates/attendance.php:134
+msgid "No students found in this class."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:105 public/templates/students.php:81
+msgid "No students found."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:115
+msgid "No students in this class."
+msgstr ""
+
+#. %s: link to edit class
+#. %s: link
+#: admin/class-noor-tms-results.php:149 public/templates/results-class.php:70
+#, php-format
+msgid "No subjects defined for this class. %s to add subjects first."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:105
+msgid "No teachers found. Add teachers first."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:246
+msgid "No teachers yet. Add a teacher to assign them to classes."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:521
+msgid "No valid marks entered. Please fill in at least one subject."
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:214 admin/class-noor-tms-settings.php:160
+#: admin/class-noor-tms-students.php:329 admin/class-noor-tms-teachers.php:495
+#: public/class-noor-tms-public-controller.php:555
+msgid "Nonce verification failed."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:44 admin/class-noor-tms-admin.php:45
+#: public/templates/login.php:17
+msgid "Noor-TMS"
+msgstr ""
+
+#. Name of the plugin
+msgid "Noor-TMS – Madrasa Management System"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:36
+msgid "Noor-TMS – Settings"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:267 public/templates/teachers.php:216
+msgid "Not linked"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:117
+msgid "Notes"
+msgstr ""
+
+#: public/templates/results-class.php:108
+msgid "Obtained"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:143
+msgid "Optional note"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:308 public/templates/student-form.php:116
+msgid "Optional. JPEG, PNG or WebP. Max 2 MB."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:645
+#: public/class-noor-tms-public-controller.php:468
+msgid "Or create a new WordPress user for this teacher."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:197 public/templates/results-class.php:109
+msgid "Out of"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:239 public/templates/attendance.php:208
+msgid "P/A/L/E"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:96 public/templates/student-form.php:41
+#: public/templates/students.php:94
+msgid "Parent's WhatsApp"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:252
+msgid "Parent's WhatsApp Number"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:323 public/templates/results-class.php:237
+msgid "Pass"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:658
+#: public/class-noor-tms-public-controller.php:481
+#: public/templates/login.php:36
+msgid "Password"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:115 admin/class-noor-tms-teachers.php:253
+#: admin/class-noor-tms-teachers.php:344 public/templates/teachers.php:61
+#: public/templates/teachers.php:202
+msgid "Phone"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:356
+#: public/class-noor-tms-public-controller.php:719
+msgid "Photo must be under 2 MB."
+msgstr ""
+
+#: public/templates/settings.php:88
+msgid ""
+"Placeholders: {student_name}, {subject}, {marks_obtained}, {total_marks}, "
+"{exam_date}"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:688
+#: public/class-noor-tms-public-controller.php:510
+msgid "Please provide a username to create a new WP user."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:700
+#: public/class-noor-tms-public-controller.php:522
+msgid "Please provide a valid email address."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:173
+msgid "Please select a class and date, then click Load."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:473
+msgid "Please select a student."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:514
+#: public/class-noor-tms-public-controller.php:575
+msgid "Please select a valid WordPress user."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:151
+#: admin/class-noor-tms-teachers.php:133 admin/class-noor-tms-teachers.php:195
+#: public/templates/attendance.php:110
+msgid "Present"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:123 public/templates/attendance.php:77
+msgid "Quick mark:"
+msgstr ""
+
+#: public/templates/login.php:37
+msgid "Remember me"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:303 public/templates/student-form.php:112
+msgid "Remove current photo"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:168 admin/class-noor-tms-classes.php:179
+msgid "Remove subject"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:270 public/templates/results-class.php:189
+msgid "Result"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:599
+msgid "Result deleted."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:586
+msgid "Result not found."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:426
+msgid "Result saved successfully."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:145 public/templates/layout.php:45
+#: public/templates/students.php:152
+msgid "Results"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:176 admin/class-noor-tms-results.php:230
+#: public/class-noor-tms-public-controller.php:105
+#: public/templates/results-class.php:140
+msgid "Save All Results"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:166
+#: admin/class-noor-tms-teachers.php:152 public/templates/attendance.php:126
+msgid "Save Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:175
+msgid "Save Result"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:126 public/templates/settings.php:94
+msgid "Save Settings"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:174
+#: public/class-noor-tms-public-controller.php:101
+msgid "Saving…"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:62 public/templates/students.php:42
+msgid "Search by name…"
+msgstr ""
+
+#: public/class-noor-tms-public-controller.php:692
+#: public/class-noor-tms-public-controller.php:749
+#: public/class-noor-tms-public-controller.php:786
+msgid "Security check failed."
+msgstr ""
+
+#: public/templates/attendance.php:138
+msgid "Select a class and date above to mark attendance."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:67
+msgid "Select a class to view and add exam results."
+msgstr ""
+
+#: public/templates/results.php:29
+msgid "Select a class to view and record exam results."
+msgstr ""
+
+#: public/templates/results-class.php:281
+msgid "Select an exam date to view its results."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:331
+msgid "Send Report"
+msgstr ""
+
+#: public/templates/results-class.php:248
+msgid "Send Report via WhatsApp"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:236 public/templates/results-class.php:148
+msgid "Send WhatsApp Report"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:102 public/templates/settings.php:75
+msgid "Sender / From Number"
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:91 admin/class-noor-tms-admin.php:92
+#: public/templates/layout.php:57 public/templates/settings.php:14
+msgid "Settings"
+msgstr ""
+
+#: public/templates/settings.php:20
+msgid "Settings saved successfully."
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:180
+msgid "Settings saved."
+msgstr ""
+
+#: public/templates/login.php:38
+msgid "Sign In"
+msgstr ""
+
+#: public/templates/layout.php:88
+msgid "Sign out"
+msgstr ""
+
+#: public/templates/login.php:22
+msgid "Staff Login"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:133 admin/class-noor-tms-students.php:98
+#: admin/class-noor-tms-students.php:275 admin/class-noor-tms-teachers.php:116
+#: admin/class-noor-tms-teachers.php:256 admin/class-noor-tms-teachers.php:376
+#: public/templates/attendance.php:92 public/templates/student-form.php:85
+#: public/templates/students.php:96 public/templates/teachers.php:88
+#: public/templates/teachers.php:205
+msgid "Status"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:132
+#: admin/class-noor-tms-attendance.php:232 admin/class-noor-tms-results.php:164
+#: admin/class-noor-tms-results.php:264 public/templates/attendance.php:91
+#: public/templates/attendance.php:201 public/templates/results-class.php:83
+#: public/templates/results-class.php:183
+msgid "Student"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:415 public/templates/students.php:31
+msgid "Student added successfully."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:384
+msgid "Student and subject are required."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:109 admin/class-noor-tms-attendance.php:60
+msgid "Student Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:402
+msgid "Student deleted."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:395 admin/class-noor-tms-results.php:481
+msgid "Student does not belong to the selected class."
+msgstr ""
+
+#: public/templates/student-form.php:37
+msgid "Student full name"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:341
+#: public/class-noor-tms-public-controller.php:704
+msgid "Student name cannot be empty."
+msgstr ""
+
+#: admin/class-noor-tms-results.php:392 admin/class-noor-tms-results.php:478
+msgid "Student not found."
+msgstr ""
+
+#: admin/class-noor-tms-students.php:294 public/templates/student-form.php:105
+msgid "Student Photo"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:260 public/templates/results-class.php:177
+msgid "Student Report Summary"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:417 public/templates/students.php:33
+msgid "Student updated successfully."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:55 admin/class-noor-tms-admin.php:56
+#: admin/class-noor-tms-students.php:50 public/templates/layout.php:26
+#: public/templates/students.php:21
+msgid "Students"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:195 public/templates/results-class.php:107
+msgid "Subject"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:191 public/templates/results-class.php:102
+msgid "Subject Marks"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:166 admin/class-noor-tms-classes.php:177
+#: public/class-noor-tms-public-controller.php:106
+#: public/templates/class-form.php:52 public/templates/class-form.php:59
+msgid "Subject name"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:155 public/templates/class-form.php:43
+msgid "Subjects"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:114 admin/class-noor-tms-teachers.php:194
+msgid "Teacher"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:727 public/templates/teachers.php:28
+msgid "Teacher added successfully."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:118 admin/class-noor-tms-admin.php:119
+#: admin/class-noor-tms-teachers.php:68
+msgid "Teacher Attendance"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:594
+msgid "Teacher deleted."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:511
+#: public/class-noor-tms-public-controller.php:572
+msgid "Teacher name cannot be empty."
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:728 public/templates/teachers.php:30
+msgid "Teacher updated successfully."
+msgstr ""
+
+#: admin/class-noor-tms-admin.php:100 admin/class-noor-tms-admin.php:101
+#: admin/class-noor-tms-teachers.php:237 public/templates/layout.php:52
+#: public/templates/teachers.php:20 public/templates/teachers.php:196
+msgid "Teachers"
+msgstr ""
+
+#: includes/class-noor-tms-roles.php:28
+msgid "TMS Manager"
+msgstr ""
+
+#: includes/class-noor-tms-roles.php:38
+msgid "TMS Teacher"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:268 public/templates/results-class.php:187
+msgid "Total"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:199
+msgid "Total Days"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:97 public/templates/settings.php:71
+msgid "Ultramsg: API Token — Twilio: Auth Token"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:86 public/templates/settings.php:63
+msgid "Ultramsg: Instance ID — Twilio: Account SID"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:195 public/templates/class-form.php:72
+msgid "Update Class"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:312 public/templates/student-form.php:121
+msgid "Update Student"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:476 public/templates/teachers.php:184
+msgid "Update Teacher"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:648
+#: public/class-noor-tms-public-controller.php:471
+#: public/templates/login.php:35
+msgid "Username"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:696
+#: public/class-noor-tms-public-controller.php:518
+msgid "Username already exists."
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:214
+#: admin/class-noor-tms-teachers.php:182 public/templates/attendance.php:183
+msgid "View"
+msgstr ""
+
+#: public/templates/results-class.php:311
+msgid "View Details →"
+msgstr ""
+
+#: admin/class-noor-tms-classes.php:104 public/templates/classes.php:68
+msgid "View Results"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:85 public/templates/results.php:46
+msgid "View Results →"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:272 public/templates/results-class.php:191
+msgid "WhatsApp"
+msgstr ""
+
+#: public/templates/settings.php:25
+msgid "WhatsApp Gateway"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:41
+msgid "WhatsApp Gateway Credentials"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:58 public/templates/settings.php:39
+msgid "WhatsApp Web (Click-to-Chat) — Free"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:355 public/templates/teachers.php:68
+msgid "WordPress User"
+msgstr ""
+
+#: public/templates/teachers.php:203
+msgid "WP User"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:328 admin/class-noor-tms-results.php:379
+#: admin/class-noor-tms-results.php:468
+msgid "You are not assigned to this class."
+msgstr ""
+
+#: public/class-noor-tms-public-controller.php:656
+#: public/class-noor-tms-public-controller.php:668
+#: public/class-noor-tms-public-controller.php:681
+msgid "You do not have permission to do this."
+msgstr ""
+
+#. Author of the plugin
+msgid "Your Name"
+msgstr ""
+
+#: admin/class-noor-tms-teachers.php:360
+msgid "â€” Select User â€”"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:129
+msgid "—"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:193 public/templates/attendance.php:152
+msgid "— All Classes —"
+msgstr ""
+
+#: public/templates/attendance.php:162
+msgid "— All My Classes —"
+msgstr ""
+
+#: admin/class-noor-tms-students.php:239 public/templates/student-form.php:66
+msgid "— No Class —"
+msgstr ""
+
+#: admin/class-noor-tms-attendance.php:91 public/templates/attendance.php:53
+msgid "— Select Class —"
+msgstr ""
+
+#: admin/class-noor-tms-results.php:168 public/templates/results-class.php:85
+msgid "— Select Student —"
+msgstr ""
+
+#: public/templates/teachers.php:71
+msgid "— Select User —"
+msgstr ""
+
+#: admin/class-noor-tms-settings.php:74
+msgid ""
+"✓ No API keys needed. Opens WhatsApp Web with message pre-filled — admin "
+"clicks Send."
+msgstr ""
