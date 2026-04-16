@@ -48,9 +48,15 @@ spl_autoload_register( function ( string $class ): void {
 	$sub_ns    = array_shift( $parts );          // 'Admin' | 'Includes'
 	$class_name = end( $parts );                 // e.g. 'Students'
 
+	// Repositories live in includes/repositories/.
+	$is_repository = count( $parts ) > 1 && strtolower( $sub_ns ) === 'includes'
+		&& strtolower( $parts[0] ?? '' ) === 'repositories';
+
 	$dir = match ( strtolower( $sub_ns ) ) {
 		'admin'        => $base_dir . 'admin/',
-		'includes'     => $base_dir . 'includes/',
+		'includes'     => $is_repository
+			? $base_dir . 'includes/repositories/'
+			: $base_dir . 'includes/',
 		'publicfacing' => $base_dir . 'public/',
 		default        => null,
 	};

@@ -90,10 +90,11 @@ final class Plugin {
 	// -----------------------------------------------------------------------
 
 	/**
-	 * Register shortcodes, front-end assets, and login-redirect filter.
+	 * Register shortcodes, front-end assets, login-redirect filter, and form processors.
 	 */
 	private function define_public_hooks(): void {
-		$public = new \Noor_TMS\PublicFacing\PublicController();
+		$public    = new \Noor_TMS\PublicFacing\PublicController();
+		$processor = new \Noor_TMS\PublicFacing\FormProcessor();
 
 		$this->loader->add_action( 'init',               $public, 'register_shortcodes' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $public, 'enqueue_assets' );
@@ -101,10 +102,10 @@ final class Plugin {
 		$this->loader->add_filter( 'login_redirect',     $public, 'redirect_after_login', 10, 3 );
 
 		// admin-post.php handlers (front-end form submissions).
-		$this->loader->add_action( 'admin_post_noor_tms_save_student',  $public, 'process_student_form' );
-		$this->loader->add_action( 'admin_post_noor_tms_save_class',    $public, 'process_class_form' );
-		$this->loader->add_action( 'admin_post_noor_tms_save_settings', $public, 'process_settings_form' );
-		$this->loader->add_action( 'admin_post_noor_tms_save_teacher',  $public, 'process_teacher_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_save_student',  $processor, 'process_student_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_save_class',    $processor, 'process_class_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_save_settings', $processor, 'process_settings_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_save_teacher',  $processor, 'process_teacher_form' );
 	}
 
 	// -----------------------------------------------------------------------

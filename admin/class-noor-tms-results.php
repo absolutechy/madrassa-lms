@@ -571,23 +571,13 @@ class Results {
 		}
 
 		if ( $result_id && $is_teacher && ! $is_manager ) {
-			global $wpdb;
-			$row = $wpdb->get_row(
-				$wpdb->prepare(
-					"SELECT r.id, st.class_id
-					   FROM " . DatabaseHandler::results_table() . " r
-					   JOIN " . DatabaseHandler::students_table() . " st ON st.id = r.student_id
-					  WHERE r.id = %d",
-					$result_id
-					),
-				OBJECT
-			);
-			if ( ! $row ) {
+			$class_id = DatabaseHandler::get_result_class_id( $result_id );
+			if ( null === $class_id ) {
 				wp_send_json_error( [ 'message' => __( 'Result not found.', 'noor-tms' ) ] );
 			}
 			$teacher   = DatabaseHandler::get_teacher_by_user( get_current_user_id() );
 			$class_ids = $teacher ? DatabaseHandler::get_teacher_class_ids( (int) $teacher['id'] ) : [];
-			if ( ! in_array( (int) $row->class_id, $class_ids, true ) ) {
+			if ( ! in_array( $class_id, $class_ids, true ) ) {
 				wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
 			}
 		}

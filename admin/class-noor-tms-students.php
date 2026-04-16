@@ -307,12 +307,14 @@ class Students {
 								   accept="image/jpeg,image/png,image/webp" />
 							<p class="description"><?php esc_html_e( 'Optional. JPEG, PNG or WebP. Max 2 MB.', 'noor-tms' ); ?></p>
 						</td>
-					</tr>
-					<div class="noor-form-actions">
-						<?php submit_button( $student ? __( 'Update Student', 'noor-tms' ) : __( 'Add Student', 'noor-tms' ), 'primary', 'submit', false ); ?>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms' ) ); ?>" class="button">
-							<?php esc_html_e( 'Cancel', 'noor-tms' ); ?>
-						</a>
+				</tr>
+				</table>
+
+				<div class="noor-form-actions">
+					<?php submit_button( $student ? __( 'Update Student', 'noor-tms' ) : __( 'Add Student', 'noor-tms' ), 'primary', 'submit', false ); ?>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms' ) ); ?>" class="button">
+						<?php esc_html_e( 'Cancel', 'noor-tms' ); ?>
+					</a>
 					</div>
 				</form>
 			</div>

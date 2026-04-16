@@ -1,6 +1,6 @@
 <?php
 /**
- * Teachers management â€“ CRUD, class assignments, and teacher attendance.
+ * Teachers management — CRUD, class assignments, and teacher attendance.
  *
  * @package Noor_TMS\Admin
  */
@@ -8,6 +8,7 @@
 namespace Noor_TMS\Admin;
 
 use Noor_TMS\Includes\DatabaseHandler;
+use Noor_TMS\Includes\TeacherUserService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,7 +18,9 @@ defined( 'ABSPATH' ) || exit;
 class Teachers {
 
 	public function __construct() {
-		add_action( 'noor_tms_teacher_handle_wp_user_fields', [ $this, 'handle_wp_user_fields' ], 10, 0 );
+		// noor_tms_teacher_handle_wp_user_fields is handled by a single subscriber
+		// registered in PublicController::register_shortcodes(), which delegates to
+		// TeacherUserService::handle_wp_user_fields(). No duplicate registration here.
 	}
 
 	// -----------------------------------------------------------------------
@@ -313,7 +316,7 @@ class Teachers {
 			}
 		}
 
-		// WP users for the dropdown (only subscriber/editor/author â€“ not admins).
+		// WP users for the dropdown (only subscriber/editor/author — not admins).
 		$wp_users = get_users( [ 'orderby' => 'display_name', 'number' => 200 ] );
 		?>
 		<div class="wrap noor-tms-wrap">
@@ -677,56 +680,12 @@ class Teachers {
 	 * @param int|null $wp_user_id
 	 * @param int      $teacher_id
 	 */
+	/**
+	 * Delegate WP user creation to the canonical TeacherUserService.
+	 * Called by handle_save() after do_action('noor_tms_teacher_handle_wp_user_fields').
+	 */
 	public function handle_wp_user_fields(): void {
-		// Bail if wp_user_id already selected.
-		if ( ! empty( $_POST['wp_user_id'] ) ) {
-			return;
-		}
-
-		$login = trim( sanitize_text_field( $_POST['new_wp_user_login'] ?? '' ) );
-		$email = trim( sanitize_email( $_POST['new_wp_user_email'] ?? '' ) );
-		$pass  = sanitize_text_field( $_POST['new_wp_user_pass'] ?? '' );
-
-		// Bail if no new user fields provided.
-		if ( empty( $login ) && empty( $email ) ) {
-			return;
-		}
-
-		if ( empty( $login ) ) {
-			wp_die( esc_html__( 'Please provide a username to create a new WP user.', 'noor-tms' ) );
-		}
-
-		if ( ! validate_username( $login ) ) {
-			wp_die( esc_html__( 'Invalid username.', 'noor-tms' ) );
-		}
-
-		if ( username_exists( $login ) ) {
-			wp_die( esc_html__( 'Username already exists.', 'noor-tms' ) );
-		}
-
-		if ( empty( $email ) || ! is_email( $email ) ) {
-			wp_die( esc_html__( 'Please provide a valid email address.', 'noor-tms' ) );
-		}
-
-		if ( email_exists( $email ) ) {
-			wp_die( esc_html__( 'Email address already in use.', 'noor-tms' ) );
-		}
-
-		if ( empty( $pass ) ) {
-			$pass = wp_generate_password( 12 );
-		}
-
-		$user_id = wp_create_user( $login, $pass, $email );
-		if ( is_wp_error( $user_id ) ) {
-			wp_die( esc_html__( 'Could not create WP user: ', 'noor-tms' ) . $user_id->get_error_message() );
-		}
-
-		$user = new \WP_User( $user_id );
-		$user->set_role( 'subscriber' );
-		$user->add_cap( 'noor_tms_teacher' );
-
-		// Update POST so handle_save() picks up the new user ID.
-		$_POST['wp_user_id'] = $user_id;
+		TeacherUserService::handle_wp_user_fields();
 	}
 
 	private function render_notices(): void {
