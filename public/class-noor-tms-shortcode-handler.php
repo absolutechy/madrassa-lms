@@ -11,6 +11,7 @@
 namespace Noor_TMS\PublicFacing;
 
 use Noor_TMS\Includes\DatabaseHandler;
+use Noor_TMS\Includes\Repositories\FeeRepository;
 use Noor_TMS\Admin\Settings;
 use Noor_TMS\Admin\WhatsApp;
 
@@ -229,6 +230,73 @@ class ShortcodeHandler {
 
 		ob_start();
 		include NOOR_TMS_PLUGIN_DIR . 'public/templates/attendance.php';
+		return ob_get_clean();
+	}
+
+	// -----------------------------------------------------------------------
+	// [noor_tms_fees]
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Fee management portal (managers only).
+	 * Shows tabs: Invoices | Payment Entry | Defaulters | Collection Report.
+	 */
+	public function sc_fees(): string {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_safe_redirect( home_url( '/tms-login/' ) );
+			exit;
+		}
+
+		// Refresh late fines on every load.
+		FeeRepository::apply_late_fines();
+
+		$tab      = sanitize_key( $_GET['tab'] ?? 'invoices' );
+		$classes  = DatabaseHandler::get_classes_dropdown();
+		$cur_month = current_time( 'Y-m' );
+
+		// Data per tab.
+		switch ( $tab ) {
+			case 'defaulters':
+				$def_month  = sanitize_text_field( $_GET['def_month'] ?? $cur_month );
+				$defaulters = FeeRepository::get_defaulters( $def_month );
+				break;
+
+			case 'report':
+				$group_by     = sanitize_key( $_GET['group_by'] ?? 'month' );
+				$report_month = sanitize_text_field( $_GET['report_month'] ?? '' );
+				$report_class = (int) ( $_GET['class_id'] ?? 0 );
+				$report_rows  = FeeRepository::get_collection_summary( [
+					'group_by'      => $group_by,
+					'invoice_month' => $report_month,
+					'class_id'      => $report_class,
+				] );
+				break;
+
+			case 'payment':
+				// All data loaded via AJAX on this tab — nothing to pre-fetch.
+				break;
+
+			default: // invoices
+				$tab            = 'invoices';
+				$inv_month      = sanitize_text_field( $_GET['invoice_month'] ?? $cur_month );
+				$inv_class      = (int) ( $_GET['class_id'] ?? 0 );
+				$inv_status     = sanitize_key( $_GET['status'] ?? '' );
+				$inv_paged      = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+				$inv_result     = FeeRepository::get_invoices( [
+					'per_page'      => 25,
+					'page'          => $inv_paged,
+					'invoice_month' => $inv_month,
+					'class_id'      => $inv_class,
+					'status'        => $inv_status,
+				] );
+				$invoices       = $inv_result['rows'];
+				$inv_total      = $inv_result['total'];
+				$inv_total_pages = (int) ceil( $inv_total / 25 );
+				break;
+		}
+
+		ob_start();
+		include NOOR_TMS_PLUGIN_DIR . 'public/templates/fees.php';
 		return ob_get_clean();
 	}
 

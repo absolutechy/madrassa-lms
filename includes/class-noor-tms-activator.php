@@ -65,6 +65,10 @@ class Activator {
 				'title'   => 'TMS Attendance',
 				'content' => '[noor_tms_attendance]',
 			],
+			'tms-fees' => [
+				'title'   => 'TMS Fees',
+				'content' => '[noor_tms_fees]',
+			],
 		];
 
 		foreach ( $pages as $slug => $page ) {

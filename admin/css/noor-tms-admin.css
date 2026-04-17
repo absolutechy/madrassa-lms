@@ -446,3 +446,156 @@ span.required {
     border-bottom-color: #2271b1;
     font-weight: 600;
 }
+
+/* ==========================================================================
+   Fee Management Module
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Fee invoice status badges
+   -------------------------------------------------------------------------- */
+.noor-fee-status-unpaid  { background: #fee2e2; color: #991b1b; }
+.noor-fee-status-partial { background: #fef9c3; color: #854d0e; }
+.noor-fee-status-paid    { background: #dcfce7; color: #166534; }
+.noor-fee-status-voided  { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
+
+.noor-fee-overdue {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* --------------------------------------------------------------------------
+   Summary cards (collection report)
+   -------------------------------------------------------------------------- */
+.noor-fee-report-cards {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+}
+
+.noor-fee-stat-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 6px;
+    padding: 16px 24px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.noor-fee-stat-card.is-success {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.noor-fee-stat-card.is-danger {
+    border-color: #fca5a5;
+    background: #fff7f7;
+}
+
+.noor-fee-stat-label {
+    font-size: 0.78rem;
+    color: #646970;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.noor-fee-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1d2327;
+    letter-spacing: -0.02em;
+}
+
+.noor-fee-stat-card.is-success .noor-fee-stat-value { color: #166534; }
+.noor-fee-stat-card.is-danger  .noor-fee-stat-value { color: #991b1b; }
+
+/* --------------------------------------------------------------------------
+   Defaulters count bar
+   -------------------------------------------------------------------------- */
+.noor-fee-summary-bar {
+    padding: 8px 12px;
+    background: #f6f7f7;
+    border-left: 4px solid #2271b1;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: #1d2327;
+}
+
+/* --------------------------------------------------------------------------
+   Payment entry – student search results list
+   -------------------------------------------------------------------------- */
+.noor-fee-student-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+    max-width: 480px;
+}
+
+.noor-fee-student-list li {
+    padding: 8px 14px;
+    border-bottom: 1px solid #f0f0f1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.noor-fee-student-list li:last-child { border-bottom: none; }
+
+.noor-fee-student-list li:hover { background: #f6f7f7; }
+
+.noor-fee-student-list .noor-fee-student-name {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.noor-fee-student-list .noor-fee-student-meta {
+    font-size: 0.8rem;
+    color: #646970;
+}
+
+/* --------------------------------------------------------------------------
+   Payment entry – invoice selector table
+   -------------------------------------------------------------------------- */
+.noor-fee-invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+}
+
+.noor-fee-invoice-table th {
+    background: #f6f7f7;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: left;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.noor-fee-invoice-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0f0f1;
+    font-size: 0.9rem;
+    vertical-align: middle;
+}
+
+.noor-fee-invoice-table tbody tr:last-child td { border-bottom: none; }
+
+.noor-fee-invoice-table .is-selected td { background: #eff6ff; }
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 782px) {
+    .noor-fee-report-cards { flex-direction: column; }
+    .noor-fee-stat-card { min-width: unset; }
+}

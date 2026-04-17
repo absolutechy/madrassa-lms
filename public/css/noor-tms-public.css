@@ -1058,3 +1058,104 @@
 	padding: 5px 12px;
 	font-size: 13px;
 }
+
+/* =========================================================================
+   Fee Management – Frontend styles
+   ========================================================================= */
+
+/* Tab nav (reuses .noor-tms-tabs) */
+.noor-tms-app .noor-tms-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 2px solid var(--tms-border);
+	margin-bottom: 20px;
+}
+
+.noor-tms-app .noor-tab-link {
+	display: inline-block;
+	padding: 8px 16px;
+	border-bottom: 3px solid transparent;
+	margin-bottom: -2px;
+	text-decoration: none;
+	color: var(--tms-muted);
+	font-weight: 500;
+	border-radius: 4px 4px 0 0;
+	transition: color .15s ease;
+}
+
+.noor-tms-app .noor-tab-link:hover { color: var(--tms-text); }
+
+.noor-tms-app .noor-tab-link.is-active {
+	color: var(--tms-primary);
+	border-bottom-color: var(--tms-primary);
+	font-weight: 600;
+}
+
+/* Invoice status badges */
+.noor-fee-status-unpaid  { background: #fee2e2; color: #991b1b; }
+.noor-fee-status-partial { background: #fef9c3; color: #854d0e; }
+.noor-fee-status-paid    { background: #dcfce7; color: #166534; }
+.noor-fee-status-voided  { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
+
+/* Generic badge (used on fee and report pages) */
+.noor-badge {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 99px;
+	font-size: 0.78rem;
+	font-weight: 600;
+}
+
+.noor-badge--success { background: #dcfce7; color: #166534; }
+.noor-badge--danger  { background: #fee2e2; color: #991b1b; }
+
+/* Numeric column alignment */
+.noor-col-num { text-align: right; }
+
+/* Student search list */
+.noor-fee-student-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	border: 1px solid var(--tms-border);
+	border-radius: 8px;
+	overflow: hidden;
+	max-width: 480px;
+}
+
+.noor-fee-student-list li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--tms-border);
+}
+
+.noor-fee-student-list li:last-child { border-bottom: none; }
+.noor-fee-student-list li:hover { background: var(--tms-bg); }
+
+/* Form rows inside payment card */
+.noor-tms-app .noor-form-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.noor-tms-app .noor-form-row label {
+	min-width: 140px;
+	font-weight: 500;
+	font-size: 0.9rem;
+}
+
+.noor-required { color: #dc3545; margin-left: 2px; }
+
+/* WhatsApp button variant */
+.noor-btn--whatsapp {
+	background: #25D366 !important;
+	border-color: #1ebe5d !important;
+	color: #fff !important;
+}
+.noor-btn--whatsapp:hover { background: #1ebe5d !important; }

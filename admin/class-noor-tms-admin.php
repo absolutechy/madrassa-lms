@@ -22,6 +22,7 @@ class Admin {
 	private Classes    $classes;
 	private Teachers   $teachers;
 	private Attendance $attendance;
+	private Fee        $fee;
 
 	public function __construct() {
 		$this->students   = new Students();
@@ -30,6 +31,7 @@ class Admin {
 		$this->classes    = new Classes();
 		$this->teachers   = new Teachers();
 		$this->attendance = new Attendance();
+		$this->fee        = new Fee();
 	}
 
 	// -----------------------------------------------------------------------
@@ -121,6 +123,15 @@ class Admin {
 			'noor-tms-teacher-attendance',
 			[ $this->teachers, 'page_teacher_attendance' ]
 		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Fee Management', 'noor-tms' ),
+			__( 'Fees', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-fees',
+			[ $this->fee, 'page_fee' ]
+		);
 	}
 
 	// -----------------------------------------------------------------------
@@ -142,6 +153,7 @@ class Admin {
 			'noor-tms_page_noor-tms-teachers',
 			'noor-tms_page_noor-tms-attendance',
 			'noor-tms_page_noor-tms-teacher-attendance',
+			'noor-tms_page_noor-tms-fees',
 		];
 
 		if ( ! in_array( $hook_suffix, $noor_pages, true ) ) {
@@ -170,14 +182,15 @@ class Admin {
 			[
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'noor_tms_ajax' ),
-				'i18n'    => [
-					'saving'        => __( 'Saving…',              'noor-tms' ),
-					'save'          => __( 'Save Result',           'noor-tms' ),
-					'saveReport'    => __( 'Save All Results',      'noor-tms' ),
-					'deleting'      => __( 'Deleting…',             'noor-tms' ),
-					'confirmDelete' => __( 'Are you sure?',         'noor-tms' ),
-					'error'         => __( 'An error occurred.',    'noor-tms' ),
-				],
+			'i18n'    => [
+				'saving'        => __( 'Saving…',                                            'noor-tms' ),
+				'save'          => __( 'Save Result',                                        'noor-tms' ),
+				'saveReport'    => __( 'Save All Results',                                   'noor-tms' ),
+				'deleting'      => __( 'Deleting…',                                          'noor-tms' ),
+				'confirmDelete' => __( 'Are you sure?',                                      'noor-tms' ),
+				'confirmVoid'   => __( 'Void this invoice? This action cannot be undone.',   'noor-tms' ),
+				'error'         => __( 'An error occurred.',                                 'noor-tms' ),
+			],
 			]
 		);
 	}
@@ -224,5 +237,35 @@ class Admin {
 
 	public function ajax_save_teacher_attendance(): void {
 		$this->teachers->ajax_save_teacher_attendance();
+	}
+
+	// ── Fee module ────────────────────────────────────────────────────────────
+
+	public function ajax_delete_fee_structure(): void {
+		$this->fee->ajax_delete_fee_structure();
+	}
+
+	public function ajax_void_invoice(): void {
+		$this->fee->ajax_void_invoice();
+	}
+
+	public function ajax_fee_search_students(): void {
+		$this->fee->ajax_search_students();
+	}
+
+	public function ajax_get_student_invoices(): void {
+		$this->fee->ajax_get_student_invoices();
+	}
+
+	public function ajax_save_fee_payment(): void {
+		$this->fee->ajax_save_payment();
+	}
+
+	public function ajax_generate_fee_invoices(): void {
+		$this->fee->ajax_generate_invoices();
+	}
+
+	public function cron_generate_fee_invoices(): void {
+		$this->fee->cron_generate_invoices();
 	}
 }

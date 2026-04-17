@@ -53,6 +53,7 @@ class PublicController {
 		add_shortcode( 'noor_tms_teachers',   [ $this->shortcodes, 'sc_teachers' ] );
 		add_shortcode( 'noor_tms_settings',   [ $this->shortcodes, 'sc_settings' ] );
 		add_shortcode( 'noor_tms_attendance', [ $this->shortcodes, 'sc_attendance' ] );
+		add_shortcode( 'noor_tms_fees',       [ $this->shortcodes, 'sc_fees' ] );
 
 		add_action( 'noor_tms_teacher_handle_wp_user_fields', [ $this, 'handle_wp_user_fields' ], 10, 0 );
 	}
@@ -72,6 +73,7 @@ class PublicController {
 			'noor_tms_classes', 'noor_tms_results',
 			'noor_tms_teachers',
 			'noor_tms_settings', 'noor_tms_attendance',
+			'noor_tms_fees',
 		];
 
 		$found = false;
@@ -105,12 +107,13 @@ class PublicController {
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'noor_tms_ajax' ),
 			'i18n'    => [
-				'saving'             => __( 'Saving…',                                    'noor-tms' ),
-				'deleting'           => __( 'Deleting…',                                  'noor-tms' ),
-				'error'              => __( 'An error occurred. Please try again.',        'noor-tms' ),
-				'confirmDelete'      => __( 'Are you sure you want to delete this?',       'noor-tms' ),
-				'saveReport'         => __( 'Save All Results',                            'noor-tms' ),
-				'subjectPlaceholder' => __( 'Subject name',                                'noor-tms' ),
+				'saving'             => __( 'Saving…',                                          'noor-tms' ),
+				'deleting'           => __( 'Deleting…',                                        'noor-tms' ),
+				'error'              => __( 'An error occurred. Please try again.',              'noor-tms' ),
+				'confirmDelete'      => __( 'Are you sure you want to delete this?',             'noor-tms' ),
+				'confirmVoid'        => __( 'Void this invoice? This action cannot be undone.',  'noor-tms' ),
+				'saveReport'         => __( 'Save All Results',                                  'noor-tms' ),
+				'subjectPlaceholder' => __( 'Subject name',                                      'noor-tms' ),
 			],
 		] );
 	}
@@ -139,6 +142,7 @@ class PublicController {
 			'noor_tms_results',  'noor_tms_teachers',
 			'noor_tms_settings',
 			'noor_tms_attendance',
+			'noor_tms_fees',
 		];
 
 		$is_tms = false;
@@ -167,6 +171,7 @@ class PublicController {
 			'noor_tms_results',  'noor_tms_teachers',
 			'noor_tms_settings',
 			'noor_tms_attendance',
+			'noor_tms_fees',
 		];
 		$is_protected = false;
 		foreach ( $protected as $sc ) {

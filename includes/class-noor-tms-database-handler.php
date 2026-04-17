@@ -26,6 +26,7 @@ use Noor_TMS\Includes\Repositories\StudentRepository;
 use Noor_TMS\Includes\Repositories\ResultRepository;
 use Noor_TMS\Includes\Repositories\TeacherRepository;
 use Noor_TMS\Includes\Repositories\AttendanceRepository;
+use Noor_TMS\Includes\Repositories\FeeRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class DatabaseHandler {
 
-	private const SCHEMA_VERSION = '3.0';
+	private const SCHEMA_VERSION = '4.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -147,6 +148,64 @@ class DatabaseHandler {
 			KEY idx_att_date (att_date)
 		) {$charset_collate};";
 
+		// ── Fee Management tables ─────────────────────────────────────────────
+		$sql_fee_structure = "CREATE TABLE " . self::fee_structure_table() . " (
+			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			class_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_title      VARCHAR(255)        NOT NULL DEFAULT '',
+			amount         DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			fine_per_day   DECIMAL(8,2)        NOT NULL DEFAULT 0.00,
+			frequency      ENUM('monthly','term','yearly') NOT NULL DEFAULT 'monthly',
+			effective_from DATE                NOT NULL,
+			created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_class_id (class_id),
+			KEY idx_effective_from (effective_from)
+		) {$charset_collate};";
+
+		$sql_fee_assignment = "CREATE TABLE " . self::fee_assignment_table() . " (
+			id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			student_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_structure_id BIGINT(20) UNSIGNED NOT NULL,
+			academic_year    VARCHAR(9)          NOT NULL DEFAULT '',
+			assigned_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_student_year (student_id, academic_year),
+			KEY idx_fee_structure_id (fee_structure_id)
+		) {$charset_collate};";
+
+		$sql_fee_invoices = "CREATE TABLE " . self::fee_invoices_table() . " (
+			id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			student_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_structure_id BIGINT(20) UNSIGNED NOT NULL,
+			invoice_month    VARCHAR(7)          NOT NULL DEFAULT '',
+			due_date         DATE                NOT NULL,
+			amount_due       DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			discount         DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			fine             DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			status           ENUM('unpaid','partial','paid','voided') NOT NULL DEFAULT 'unpaid',
+			created_at       DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_student_month (student_id, invoice_month),
+			KEY idx_status (status),
+			KEY idx_invoice_month (invoice_month),
+			KEY idx_student_id (student_id)
+		) {$charset_collate};";
+
+		$sql_fee_payments = "CREATE TABLE " . self::fee_payments_table() . " (
+			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			invoice_id     BIGINT(20) UNSIGNED NOT NULL,
+			paid_amount    DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			payment_date   DATE                NOT NULL,
+			payment_method ENUM('cash','bank','cheque') NOT NULL DEFAULT 'cash',
+			received_by    BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			remarks        TEXT,
+			created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_invoice_id (invoice_id),
+			KEY idx_payment_date (payment_date)
+		) {$charset_collate};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql_classes );
 		dbDelta( $sql_subjects );
@@ -156,6 +215,10 @@ class DatabaseHandler {
 		dbDelta( $sql_class_teachers );
 		dbDelta( $sql_student_att );
 		dbDelta( $sql_teacher_att );
+		dbDelta( $sql_fee_structure );
+		dbDelta( $sql_fee_assignment );
+		dbDelta( $sql_fee_invoices );
+		dbDelta( $sql_fee_payments );
 
 		$installed = get_option( self::SCHEMA_OPTION, '1.0' );
 
@@ -186,6 +249,11 @@ class DatabaseHandler {
 	public static function drop_tables(): void {
 		global $wpdb;
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		// Fee tables (use direct prefix to avoid autoloader dependency in uninstall.php).
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'lms_fee_payments' );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'lms_fee_invoices' );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'lms_student_fee_assignment' );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'lms_fee_structure' );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::teacher_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::student_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::class_teachers_table() );
@@ -201,6 +269,16 @@ class DatabaseHandler {
 	// -----------------------------------------------------------------------
 	// Table name helpers (delegated to repositories)
 	// -----------------------------------------------------------------------
+
+	// ── Fee table name helpers ────────────────────────────────────────────────
+	/** @return string */
+	public static function fee_structure_table(): string        { return FeeRepository::fee_structure_table(); }
+	/** @return string */
+	public static function fee_assignment_table(): string       { return FeeRepository::fee_assignment_table(); }
+	/** @return string */
+	public static function fee_invoices_table(): string         { return FeeRepository::fee_invoices_table(); }
+	/** @return string */
+	public static function fee_payments_table(): string         { return FeeRepository::fee_payments_table(); }
 
 	/** @return string Fully-qualified table name. */
 	public static function classes_table(): string              { return ClassRepository::classes_table(); }
@@ -413,5 +491,33 @@ class DatabaseHandler {
 
 	public static function get_teacher_attendance_for_date( string $date ): array {
 		return AttendanceRepository::get_teacher_attendance_for_date( $date );
+	}
+
+	// -----------------------------------------------------------------------
+	// Fee Management (delegated to FeeRepository)
+	// -----------------------------------------------------------------------
+
+	public static function insert_fee_structure( array $data ): int|false {
+		return FeeRepository::insert_fee_structure( $data );
+	}
+
+	public static function update_fee_structure( int $id, array $data ): bool {
+		return FeeRepository::update_fee_structure( $id, $data );
+	}
+
+	public static function delete_fee_structure( int $id ): bool {
+		return FeeRepository::delete_fee_structure( $id );
+	}
+
+	public static function get_fee_structures( int $class_id = 0 ): array {
+		return FeeRepository::get_fee_structures( $class_id );
+	}
+
+	public static function get_fee_structure( int $id ): ?array {
+		return FeeRepository::get_fee_structure( $id );
+	}
+
+	public static function generate_invoices_for_month( string $month, string $academic_year ): int {
+		return FeeRepository::generate_invoices_for_month( $month, $academic_year );
 	}
 }

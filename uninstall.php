@@ -27,6 +27,9 @@ $options = [
     'noor_tms_db_version',
 ];
 
+// Clear scheduled cron events.
+wp_clear_scheduled_hook( 'noor_tms_generate_monthly_invoices' );
+
 foreach ( $options as $option ) {
     delete_option( $option );
 }

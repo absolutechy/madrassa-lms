@@ -83,6 +83,60 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_noor_tms_delete_teacher',            $admin, 'ajax_delete_teacher' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_student_attendance',   $admin, 'ajax_save_student_attendance' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_teacher_attendance',   $admin, 'ajax_save_teacher_attendance' );
+
+		// Fee Management AJAX (admin-only).
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_delete_structure',  $admin, 'ajax_delete_fee_structure' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_void_invoice',      $admin, 'ajax_void_invoice' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_search_students',   $admin, 'ajax_fee_search_students' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_get_invoices',      $admin, 'ajax_get_student_invoices' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_save_payment',      $admin, 'ajax_save_fee_payment' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_fee_generate_invoices', $admin, 'ajax_generate_fee_invoices' );
+
+		// WP Cron – monthly invoice generation.
+		$this->loader->add_filter( 'cron_schedules',                    $this, 'add_monthly_cron_schedule' );
+		$this->loader->add_action( 'noor_tms_generate_monthly_invoices', $admin, 'cron_generate_fee_invoices' );
+		$this->loader->add_action( 'init',                               $this, 'schedule_monthly_cron' );
+	}
+
+	/**
+	 * Add a "monthly" interval to WP Cron schedules if not already present.
+	 *
+	 * @param array<string, array<string, mixed>> $schedules
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function add_monthly_cron_schedule( array $schedules ): array {
+		if ( ! isset( $schedules['monthly'] ) ) {
+			$schedules['monthly'] = [
+				'interval' => 30 * DAY_IN_SECONDS,
+				'display'  => __( 'Once Monthly', 'noor-tms' ),
+			];
+		}
+		return $schedules;
+	}
+
+	/**
+	 * Schedule the monthly invoice cron event if not already scheduled.
+	 * Also ensures the tms-fees page exists (handles existing installs that
+	 * activated the plugin before the fee module was added).
+	 */
+	public function schedule_monthly_cron(): void {
+		if ( ! wp_next_scheduled( 'noor_tms_generate_monthly_invoices' ) ) {
+			$next_month = strtotime( 'first day of next month 00:05:00' );
+			wp_schedule_event( $next_month, 'monthly', 'noor_tms_generate_monthly_invoices' );
+		}
+
+		// Ensure the tms-fees WordPress page exists.
+		if ( ! get_page_by_path( 'tms-fees' ) ) {
+			wp_insert_post( [
+				'post_title'     => 'TMS Fees',
+				'post_name'      => 'tms-fees',
+				'post_content'   => '[noor_tms_fees]',
+				'post_status'    => 'publish',
+				'post_author'    => 1,
+				'post_type'      => 'page',
+				'comment_status' => 'closed',
+			] );
+		}
 	}
 
 	// -----------------------------------------------------------------------

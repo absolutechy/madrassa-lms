@@ -377,4 +377,256 @@
         } );
     } );
 
+    // -----------------------------------------------------------------------
+    // 10. Fee Management
+    // -----------------------------------------------------------------------
+
+    // --- 10a. Delete fee structure ---
+    $( document ).on( 'click', '.noor-fee-delete-structure', function () {
+        if ( ! confirm( noorTMS.i18n.confirmDelete ) ) { return; }
+
+        const $btn = $( this );
+        const id   = $btn.data( 'id' );
+        $btn.prop( 'disabled', true ).text( noorTMS.i18n.deleting );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:       'noor_tms_fee_delete_structure',
+            structure_id: id,
+            nonce:        noorTMS.nonce,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $( '#noor-fee-struct-row-' + id ).fadeOut( 300, function () { $( this ).remove(); } );
+            } else {
+                alert( r.data.message || noorTMS.i18n.error );
+                $btn.prop( 'disabled', false ).text( 'Delete' );
+            }
+        } )
+        .fail( function () {
+            alert( noorTMS.i18n.error );
+            $btn.prop( 'disabled', false ).text( 'Delete' );
+        } );
+    } );
+
+    // --- 10b. Void invoice ---
+    $( document ).on( 'click', '.noor-fee-void-invoice', function () {
+        if ( ! confirm( noorTMS.i18n.confirmVoid || 'Void this invoice? This cannot be undone.' ) ) { return; }
+
+        const $btn = $( this );
+        const id   = $btn.data( 'id' );
+        $btn.prop( 'disabled', true ).text( '…' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:     'noor_tms_fee_void_invoice',
+            invoice_id: id,
+            nonce:      noorTMS.nonce,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                const $row = $( '#noor-fee-inv-row-' + id );
+                $row.find( '.noor-status-badge' )
+                    .removeClass( 'noor-fee-status-unpaid noor-fee-status-partial noor-fee-status-paid' )
+                    .addClass( 'noor-fee-status-voided' )
+                    .text( 'Voided' );
+                $btn.remove();
+            } else {
+                alert( r.data.message || noorTMS.i18n.error );
+                $btn.prop( 'disabled', false ).text( 'Void' );
+            }
+        } )
+        .fail( function () {
+            alert( noorTMS.i18n.error );
+            $btn.prop( 'disabled', false ).text( 'Void' );
+        } );
+    } );
+
+    // --- 10c. Generate invoices ---
+    $( '#noor-fee-generate-btn' ).on( 'click', function () {
+        const $btn      = $( this );
+        const $feedback = $( '#noor-fee-generate-feedback' );
+        const month     = $btn.data( 'month' );
+        const year      = $btn.data( 'year' );
+
+        $btn.prop( 'disabled', true );
+        $feedback.text( noorTMS.i18n.saving || 'Generating…' ).removeClass( 'is-error is-success' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:        'noor_tms_fee_generate_invoices',
+            month:         month,
+            academic_year: year,
+            nonce:         noorTMS.nonce,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $feedback.addClass( 'is-success' ).text( r.data.message );
+                setTimeout( function () { window.location.reload(); }, 1500 );
+            } else {
+                $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+                $btn.prop( 'disabled', false );
+            }
+        } )
+        .fail( function () {
+            $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+            $btn.prop( 'disabled', false );
+        } );
+    } );
+
+    // --- 10d. Payment entry – student search ---
+    $( '#noor-fee-search-btn' ).on( 'click', feeSearchStudents );
+    $( '#noor-fee-student-search' ).on( 'keydown', function ( e ) {
+        if ( e.key === 'Enter' ) { e.preventDefault(); feeSearchStudents(); }
+    } );
+
+    function feeSearchStudents() {
+        const q         = $.trim( $( '#noor-fee-student-search' ).val() );
+        const $spinner  = $( '#noor-fee-search-spinner' );
+        const $results  = $( '#noor-fee-student-results' );
+
+        if ( q.length < 2 ) {
+            $results.html( '<p class="description">Please enter at least 2 characters.</p>' );
+            return;
+        }
+
+        $spinner.text( 'Searching…' ).removeClass( 'is-error is-success' );
+        $results.empty();
+
+        $.post( noorTMS.ajaxUrl, {
+            action: 'noor_tms_fee_search_students',
+            q:      q,
+            nonce:  noorTMS.nonce,
+        } )
+        .done( function ( r ) {
+            $spinner.text( '' );
+            if ( ! r.success ) {
+                $results.html( '<p class="description">' + escHtml( r.data.message ) + '</p>' );
+                return;
+            }
+            const students = r.data.students;
+            if ( ! students.length ) {
+                $results.html( '<p class="description">No active students found.</p>' );
+                return;
+            }
+            let html = '<ul class="noor-fee-student-list">';
+            students.forEach( function ( s ) {
+                html += '<li>' +
+                    '<span><span class="noor-fee-student-name">' + escHtml( s.name ) + '</span>' +
+                    ( s.class_name ? ' <span class="noor-fee-student-meta">(' + escHtml( s.class_name ) + ')</span>' : '' ) +
+                    '</span>' +
+                    '<button type="button" class="button button-small noor-fee-select-student"' +
+                    ' data-id="' + s.id + '" data-name="' + escHtml( s.name ) + '">Select</button>' +
+                    '</li>';
+            } );
+            html += '</ul>';
+            $results.html( html );
+        } )
+        .fail( function () {
+            $spinner.addClass( 'is-error' ).text( noorTMS.i18n.error );
+        } );
+    }
+
+    // --- 10e. Payment entry – select student → load invoices ---
+    $( document ).on( 'click', '.noor-fee-select-student', function () {
+        const studentId   = $( this ).data( 'id' );
+        const studentName = $( this ).data( 'name' );
+
+        $( '#noor-fee-invoice-title' ).text( 'Outstanding Invoices — ' + escHtml( studentName ) );
+        $( '#noor-fee-invoice-section' ).show();
+        $( '#noor-fee-payment-section' ).hide();
+        $( '#noor-fee-invoice-list' ).html( '<p>Loading…</p>' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:     'noor_tms_fee_get_invoices',
+            student_id: studentId,
+            nonce:      noorTMS.nonce,
+        } )
+        .done( function ( r ) {
+            if ( ! r.success ) {
+                $( '#noor-fee-invoice-list' ).html( '<p class="description">' + escHtml( r.data.message ) + '</p>' );
+                return;
+            }
+            const invoices = r.data.invoices;
+            if ( ! invoices.length ) {
+                $( '#noor-fee-invoice-list' ).html( '<p class="description">No outstanding invoices for this student.</p>' );
+                return;
+            }
+
+            let html = '<table class="noor-fee-invoice-table">' +
+                '<thead><tr>' +
+                '<th></th><th>Month</th><th>Fee</th>' +
+                '<th style="text-align:right;">Net Due</th>' +
+                '<th style="text-align:right;">Paid</th>' +
+                '<th style="text-align:right;">Balance</th>' +
+                '<th>Status</th>' +
+                '</tr></thead><tbody>';
+
+            invoices.forEach( function ( inv ) {
+                const statusClass = 'noor-fee-status-' + inv.status;
+                html += '<tr class="noor-fee-inv-select-row" data-id="' + inv.id + '"' +
+                    ' data-balance="' + inv.balance + '">' +
+                    '<td><input type="radio" name="noor_fee_inv_pick" value="' + inv.id +
+                    '" data-balance="' + inv.balance + '"></td>' +
+                    '<td>' + escHtml( inv.invoice_month ) + '</td>' +
+                    '<td>' + escHtml( inv.fee_title ) + '</td>' +
+                    '<td style="text-align:right;">' + inv.net_due.toFixed( 2 ) + '</td>' +
+                    '<td style="text-align:right;">' + inv.total_paid.toFixed( 2 ) + '</td>' +
+                    '<td style="text-align:right;"><strong>' + inv.balance.toFixed( 2 ) + '</strong></td>' +
+                    '<td><span class="noor-status-badge ' + statusClass + '">' + escHtml( inv.status ) + '</span></td>' +
+                    '</tr>';
+            } );
+            html += '</tbody></table>';
+            $( '#noor-fee-invoice-list' ).html( html );
+        } )
+        .fail( function () {
+            $( '#noor-fee-invoice-list' ).html( '<p class="description">' + noorTMS.i18n.error + '</p>' );
+        } );
+    } );
+
+    // Select invoice row → show payment form.
+    $( document ).on( 'change', 'input[name="noor_fee_inv_pick"]', function () {
+        const invoiceId = $( this ).val();
+        const balance   = parseFloat( $( this ).data( 'balance' ) ) || 0;
+
+        // Highlight selected row.
+        $( '.noor-fee-inv-select-row' ).removeClass( 'is-selected' );
+        $( this ).closest( 'tr' ).addClass( 'is-selected' );
+
+        $( '#noor-fee-invoice-id' ).val( invoiceId );
+        $( '#noor-fee-amount' ).val( balance.toFixed( 2 ) ).attr( 'max', balance );
+        $( '#noor-fee-balance-note' ).text( 'Outstanding balance: ' + balance.toFixed( 2 ) );
+        $( '#noor-fee-payment-section' ).show();
+        $( '#noor-fee-pay-feedback' ).text( '' ).removeClass( 'is-error is-success' );
+    } );
+
+    // --- 10f. Submit payment ---
+    $( '#noor-fee-payment-form' ).on( 'submit', function ( e ) {
+        e.preventDefault();
+
+        const $form     = $( this );
+        const $btn      = $( '#noor-fee-pay-btn' );
+        const $feedback = $( '#noor-fee-pay-feedback' );
+
+        $btn.prop( 'disabled', true ).text( 'Saving…' );
+        $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+        $.post( noorTMS.ajaxUrl, $form.serialize() + '&action=noor_tms_fee_save_payment&nonce=' + encodeURIComponent( noorTMS.nonce ) )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $feedback.addClass( 'is-success' ).text( r.data.message );
+                $form[0].reset();
+                $( '#noor-fee-payment-section' ).hide();
+                $( '#noor-fee-invoice-section' ).hide();
+                $( '#noor-fee-student-results' ).empty();
+                $( '#noor-fee-student-search' ).val( '' );
+            } else {
+                $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+            }
+        } )
+        .fail( function () {
+            $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+        } )
+        .always( function () {
+            $btn.prop( 'disabled', false ).text( 'Record Payment' );
+        } );
+    } );
+
 } )( jQuery );

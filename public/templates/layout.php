@@ -52,6 +52,11 @@ if ( $is_manager ) {
 		'label' => __( 'Teachers',  'noor-tms' ),
 		'url'   => home_url( '/tms-teachers/' ),
 	];
+	$nav_items['fees'] = [
+		'icon'  => '&#128176;',
+		'label' => __( 'Fees',      'noor-tms' ),
+		'url'   => home_url( '/tms-fees/' ),
+	];
 	/*
 	$nav_items['settings'] = [
 		'icon'  => '&#9881;',
