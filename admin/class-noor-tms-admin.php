@@ -22,6 +22,7 @@ class Admin {
 	private Classes    $classes;
 	private Teachers   $teachers;
 	private Attendance $attendance;
+	private Fees       $fees;
 
 	public function __construct() {
 		$this->students   = new Students();
@@ -30,6 +31,7 @@ class Admin {
 		$this->classes    = new Classes();
 		$this->teachers   = new Teachers();
 		$this->attendance = new Attendance();
+		$this->fees       = new Fees();
 	}
 
 	// -----------------------------------------------------------------------
@@ -121,6 +123,15 @@ class Admin {
 			'noor-tms-teacher-attendance',
 			[ $this->teachers, 'page_teacher_attendance' ]
 		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Fee Management', 'noor-tms' ),
+			__( 'Fee Management', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-fees',
+			[ $this->fees, 'render_page' ]
+		);
 	}
 
 	// -----------------------------------------------------------------------
@@ -142,6 +153,7 @@ class Admin {
 			'noor-tms_page_noor-tms-teachers',
 			'noor-tms_page_noor-tms-attendance',
 			'noor-tms_page_noor-tms-teacher-attendance',
+			'noor-tms_page_noor-tms-fees',
 		];
 
 		if ( ! in_array( $hook_suffix, $noor_pages, true ) ) {

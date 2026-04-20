@@ -28,7 +28,7 @@ class Students {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
-		$search   = sanitize_text_field( $_GET['s'] ?? '' );
+		$search   = sanitize_text_field( $_GET['noor_search'] ?? ($_GET['s'] ?? '') );
 		$status   = sanitize_key( $_GET['status_filter'] ?? '' );
 		$class_id = (int) ( $_GET['class_id'] ?? 0 );
 		$paged    = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
@@ -55,13 +55,15 @@ class Students {
 			<?php $this->render_notices(); ?>
 
 			<!-- Search & filter bar -->
-			<form method="get" action="">
-				<input type="hidden" name="page" value="noor-tms" />
-				<p class="search-box">
-					<input type="search" name="s" value="<?php echo esc_attr( $search ); ?>"
+			<div class="search-box">
+				<?php if ( is_admin() ) : ?>
+					<input type="hidden" id="noor_page" value="noor-tms" />
+				<?php endif; ?>
+				<p>
+					<input type="search" id="noor_search_input" value="<?php echo esc_attr( $search ); ?>"
 						   placeholder="<?php esc_attr_e( 'Search by name…', 'noor-tms' ); ?>" class="noor-search-input" />
 
-					<select name="class_id">
+					<select id="noor_class_id">
 						<option value=""><?php esc_html_e( 'All Classes', 'noor-tms' ); ?></option>
 						<?php foreach ( $classes as $cls ) : ?>
 							<option value="<?php echo esc_attr( $cls['id'] ); ?>"
@@ -71,7 +73,7 @@ class Students {
 						<?php endforeach; ?>
 					</select>
 
-					<select name="status_filter">
+					<select id="noor_status_filter">
 						<option value=""><?php esc_html_e( 'All Statuses', 'noor-tms' ); ?></option>
 						<?php
 						foreach ( [ 'active' => __( 'Active', 'noor-tms' ), 'inactive' => __( 'Inactive', 'noor-tms' ), 'graduated' => __( 'Graduated', 'noor-tms' ) ] as $val => $lbl ) {
@@ -84,9 +86,46 @@ class Students {
 						}
 						?>
 					</select>
-					<?php submit_button( __( 'Filter', 'noor-tms' ), 'secondary', '', false ); ?>
+					<button type="button" class="button secondary" onclick="applyNoorFilter();"><?php esc_html_e( 'Filter', 'noor-tms' ); ?></button>
 				</p>
-			</form>
+			</div>
+
+			<script>
+            function applyNoorFilter() {
+                const url = new URL(window.location.href);
+                
+                // Clear existing parameters
+                url.searchParams.delete('noor_search');
+                url.searchParams.delete('s');
+                url.searchParams.delete('class_id');
+                url.searchParams.delete('status_filter');
+                url.searchParams.delete('paged');
+                
+                // Add page param if in admin
+                const pageInput = document.getElementById('noor_page');
+                if (pageInput) {
+                    url.searchParams.set('page', pageInput.value);
+                }
+                
+                const search = document.getElementById('noor_search_input').value.trim();
+                const classId = document.getElementById('noor_class_id').value;
+                const status = document.getElementById('noor_status_filter').value;
+                
+                if (search) url.searchParams.set('noor_search', search);
+                if (classId) url.searchParams.set('class_id', classId);
+                if (status) url.searchParams.set('status_filter', status);
+                
+                window.location.href = url.toString();
+            }
+
+            // Also attach Enter key on search input
+            document.getElementById('noor_search_input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyNoorFilter();
+                }
+            });
+			</script>
 
 			<table class="wp-list-table widefat fixed striped noor-tms-table">
 				<thead>

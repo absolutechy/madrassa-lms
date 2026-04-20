@@ -27,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '3.0';
+	private const SCHEMA_VERSION = '4.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -169,6 +169,63 @@ class DatabaseHandler {
 			KEY idx_att_date (att_date)
 		) {$charset_collate};";
 
+		// ----------------------------------------------------------------
+		// Fee Modules
+		// ----------------------------------------------------------------
+		$sql_fee_structure = "CREATE TABLE " . self::fee_structure_table() . " (
+			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			class_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_title      VARCHAR(255)        NOT NULL,
+			amount         DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			frequency      ENUM('monthly','term','yearly') NOT NULL DEFAULT 'monthly',
+			effective_from DATE                NOT NULL,
+			created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_class_id (class_id)
+		) {$charset_collate};";
+
+		$sql_fee_assignment = "CREATE TABLE " . self::student_fee_assignment_table() . " (
+			id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			student_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_structure_id BIGINT(20) UNSIGNED NOT NULL,
+			academic_year    VARCHAR(20)         NOT NULL,
+			assigned_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_student_fee_year (student_id, fee_structure_id, academic_year),
+			KEY idx_academic_year (academic_year)
+		) {$charset_collate};";
+
+		$sql_fee_invoices = "CREATE TABLE " . self::fee_invoices_table() . " (
+			id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			student_id       BIGINT(20) UNSIGNED NOT NULL,
+			fee_structure_id BIGINT(20) UNSIGNED NOT NULL,
+			invoice_month    VARCHAR(7)          NOT NULL, -- Format YYYY-MM
+			academic_year    VARCHAR(20)         NOT NULL,
+			due_date         DATE                NOT NULL,
+			amount_due       DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			discount         DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			fine             DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			status           ENUM('unpaid','partial','paid','void') NOT NULL DEFAULT 'unpaid',
+			created_at       DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_student_structure_month (student_id, fee_structure_id, invoice_month),
+			KEY idx_status_month (status, invoice_month),
+			KEY idx_academic_year (academic_year)
+		) {$charset_collate};";
+
+		$sql_fee_payments = "CREATE TABLE " . self::fee_payments_table() . " (
+			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			invoice_id     BIGINT(20) UNSIGNED NOT NULL,
+			paid_amount    DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
+			payment_date   DATE                NOT NULL,
+			payment_method ENUM('cash','bank','cheque') NOT NULL DEFAULT 'cash',
+			received_by    BIGINT(20) UNSIGNED NOT NULL,
+			remarks        TEXT,
+			created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_invoice_id (invoice_id)
+		) {$charset_collate};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql_classes );
 		dbDelta( $sql_subjects );
@@ -178,6 +235,10 @@ class DatabaseHandler {
 		dbDelta( $sql_class_teachers );
 		dbDelta( $sql_student_att );
 		dbDelta( $sql_teacher_att );
+		dbDelta( $sql_fee_structure );
+		dbDelta( $sql_fee_assignment );
+		dbDelta( $sql_fee_invoices );
+		dbDelta( $sql_fee_payments );
 
 		$installed = get_option( self::SCHEMA_OPTION, '1.0' );
 
@@ -219,6 +280,10 @@ class DatabaseHandler {
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::students_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::subjects_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::classes_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::fee_payments_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::fee_invoices_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::student_fee_assignment_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::fee_structure_table() );
 		// phpcs:enable
 		delete_option( self::SCHEMA_OPTION );
 	}
@@ -267,6 +332,26 @@ class DatabaseHandler {
 		return $wpdb->prefix . 'mms_teacher_attendance';
 	}
 
+	public static function fee_structure_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_fee_structure';
+	}
+
+	public static function student_fee_assignment_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_student_fee_assignment';
+	}
+
+	public static function fee_invoices_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_fee_invoices';
+	}
+
+	public static function fee_payments_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_fee_payments';
+	}
+
 	// -----------------------------------------------------------------------
 	// Classes CRUD
 	// -----------------------------------------------------------------------
@@ -311,6 +396,306 @@ class DatabaseHandler {
 			ARRAY_A
 		);
 		return $rows ?: [];
+	}
+
+	// -----------------------------------------------------------------------
+	// Fees CRUD
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Get all fee structures.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_fee_structures(): array {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			'SELECT fs.*, c.name as class_name
+			   FROM ' . self::fee_structure_table() . ' fs
+			   LEFT JOIN ' . self::classes_table() . ' c ON c.id = fs.class_id
+			  ORDER BY fs.id DESC',
+			ARRAY_A
+		);
+		return $rows ?: [];
+	}
+
+	public static function insert_fee_structure( int $class_id, string $title, float $amount, string $frequency, string $effective_from ): int|false {
+		global $wpdb;
+		$inserted = $wpdb->insert(
+			self::fee_structure_table(),
+			[
+				'class_id'       => $class_id,
+				'fee_title'      => sanitize_text_field( $title ),
+				'amount'         => $amount,
+				'frequency'      => sanitize_text_field( $frequency ),
+				'effective_from' => sanitize_text_field( $effective_from ),
+				'created_at'     => current_time( 'mysql' ),
+			],
+			[ '%d', '%s', '%f', '%s', '%s', '%s' ]
+		);
+		return $inserted ? (int) $wpdb->insert_id : false;
+	}
+
+	public static function update_fee_structure( int $id, int $class_id, string $title, float $amount, string $frequency, string $effective_from ): bool {
+		global $wpdb;
+		$updated = $wpdb->update(
+			self::fee_structure_table(),
+			[
+				'class_id'       => $class_id,
+				'fee_title'      => sanitize_text_field( $title ),
+				'amount'         => $amount,
+				'frequency'      => sanitize_text_field( $frequency ),
+				'effective_from' => sanitize_text_field( $effective_from ),
+			],
+			[ 'id' => $id ],
+			[ '%d', '%s', '%f', '%s', '%s' ],
+			[ '%d' ]
+		);
+		return false !== $updated;
+	}
+
+	public static function delete_fee_structure( int $id ): bool {
+		global $wpdb;
+		$deleted = $wpdb->delete(
+			self::fee_structure_table(),
+			[ 'id' => $id ],
+			[ '%d' ]
+		);
+		return false !== $deleted;
+	}
+
+	public static function get_fee_structure( int $id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::fee_structure_table() . ' WHERE id = %d',
+				$id
+			),
+			ARRAY_A
+		);
+		return $row ?: null;
+	}
+
+	public static function assign_student_fee( int $student_id, int $fee_structure_id, string $academic_year ): int|false {
+		global $wpdb;
+		$inserted = $wpdb->insert(
+			self::student_fee_assignment_table(),
+			[
+				'student_id'       => $student_id,
+				'fee_structure_id' => $fee_structure_id,
+				'academic_year'    => sanitize_text_field( $academic_year ),
+				'assigned_at'      => current_time( 'mysql' ),
+			],
+			[ '%d', '%d', '%s', '%s' ]
+		);
+		return $inserted ? (int) $wpdb->insert_id : false;
+	}
+
+	public static function void_invoice( int $invoice_id ): bool {
+		global $wpdb;
+		$updated = $wpdb->update(
+			self::fee_invoices_table(),
+			[ 'status' => 'void' ],
+			[ 'id' => $invoice_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
+		return false !== $updated;
+	}
+
+	/**
+	 * Get fee dashboard stats
+	 * 
+	 * @return array<string, mixed>
+	 */
+	public static function get_fee_dashboard_stats(): array {
+		global $wpdb;
+		$stats = [
+			'total_collected' => 0,
+			'total_due'       => 0,
+			'unpaid_count'    => 0,
+			'paid_count'      => 0,
+		];
+
+		$current_month = date('Y-m');
+
+		// Total collected this month
+		$collected = $wpdb->get_var( "
+			SELECT SUM(paid_amount) 
+			FROM " . self::fee_payments_table() . " 
+			WHERE payment_date LIKE '{$current_month}%'
+		" );
+		$stats['total_collected'] = (float) $collected;
+
+		// Stats for current month invoices
+		$invoices_stats = $wpdb->get_row( "
+			SELECT 
+				SUM(amount_due + fine - discount) as total_due,
+				SUM(CASE WHEN status IN ('unpaid', 'partial') THEN 1 ELSE 0 END) as unpaid_count,
+				SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count
+			FROM " . self::fee_invoices_table() . "
+			WHERE invoice_month = '{$current_month}' AND status != 'void'
+		", ARRAY_A );
+
+		if ( $invoices_stats ) {
+			$stats['total_due']    = (float) $invoices_stats['total_due'];
+			$stats['unpaid_count'] = (int) $invoices_stats['unpaid_count'];
+			$stats['paid_count']   = (int) $invoices_stats['paid_count'];
+		}
+
+		return $stats;
+	}
+
+	/**
+	 * Get all invoices.
+	 * 
+	 * @return array
+	 */
+	public static function get_invoices( $args = [] ): array {
+		global $wpdb;
+		
+		$where = ["i.status != 'void'"];
+		
+		if ( ! empty( $args['month'] ) ) {
+			$where[] = $wpdb->prepare( "i.invoice_month = %s", $args['month'] );
+		}
+		
+		if ( ! empty( $args['status'] ) ) {
+			$where[] = $wpdb->prepare( "i.status = %s", $args['status'] );
+		}
+		
+		// If searching by student name
+		if ( ! empty( $args['search'] ) ) {
+			$where[] = $wpdb->prepare( "s.name LIKE %s", '%' . $wpdb->esc_like( $args['search'] ) . '%' );
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		$query = "
+			SELECT 
+				i.*,
+				s.name AS student_name,
+				c.name AS class_name,
+				(i.amount_due + i.fine - i.discount) AS net_due,
+				COALESCE(SUM(p.paid_amount), 0) AS total_paid
+			FROM " . self::fee_invoices_table() . " i
+			JOIN " . self::students_table() . " s ON i.student_id = s.id
+			LEFT JOIN " . self::classes_table() . " c ON s.class_id = c.id
+			LEFT JOIN " . self::fee_payments_table() . " p ON i.id = p.invoice_id
+			WHERE {$where_sql}
+			GROUP BY i.id
+			ORDER BY i.invoice_month DESC, s.name ASC
+		";
+
+		return $wpdb->get_results( $query, ARRAY_A ) ?: [];
+	}
+
+	/**
+	 * Get unpaid invoices by student ID
+	 */
+	public static function get_unpaid_invoices_by_student( int $student_id ): array {
+		global $wpdb;
+		$query = $wpdb->prepare( "
+			SELECT 
+				i.*,
+				(i.amount_due + i.fine - i.discount) AS net_due,
+				COALESCE(SUM(p.paid_amount), 0) AS total_paid
+			FROM " . self::fee_invoices_table() . " i
+			LEFT JOIN " . self::fee_payments_table() . " p ON i.id = p.invoice_id
+			WHERE i.student_id = %d AND i.status IN ('unpaid', 'partial')
+			GROUP BY i.id
+			ORDER BY i.invoice_month ASC
+		", $student_id );
+
+		return $wpdb->get_results( $query, ARRAY_A ) ?: [];
+	}
+
+	/**
+	 * Get list of students with unpaid or partial invoices.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_defaulters(): array {
+		global $wpdb;
+		
+		$query = $wpdb->prepare( "
+			SELECT 
+				s.id AS student_id,
+				s.name AS student_name,
+				s.parent_phone,
+				c.name AS class_name,
+				i.id AS invoice_id,
+				i.invoice_month,
+				i.amount_due,
+				i.fine,
+				i.discount,
+				(i.amount_due + i.fine - i.discount) AS net_due,
+				COALESCE(SUM(p.paid_amount), 0) AS total_paid,
+				i.status
+			FROM " . self::fee_invoices_table() . " i
+			JOIN " . self::students_table() . " s ON i.student_id = s.id
+			LEFT JOIN " . self::classes_table() . " c ON s.class_id = c.id
+			LEFT JOIN " . self::fee_payments_table() . " p ON i.id = p.invoice_id
+			WHERE i.status IN ('unpaid', 'partial')
+			GROUP BY i.id
+			ORDER BY c.name ASC, s.name ASC, i.invoice_month ASC
+		" );
+		
+		$results = $wpdb->get_results( $query, ARRAY_A );
+		return $results ?: [];
+	}
+
+	public static function add_fee_payment( int $invoice_id, float $amount, string $date, string $method, int $received_by, string $remarks = '' ): int|false {
+		global $wpdb;
+		
+		$wpdb->query('START TRANSACTION');
+
+		$inserted = $wpdb->insert(
+			self::fee_payments_table(),
+			[
+				'invoice_id'     => $invoice_id,
+				'paid_amount'    => $amount,
+				'payment_date'   => sanitize_text_field( $date ),
+				'payment_method' => sanitize_text_field( $method ),
+				'received_by'    => $received_by,
+				'remarks'        => sanitize_text_field( $remarks ),
+				'created_at'     => current_time( 'mysql' ),
+			],
+			[ '%d', '%f', '%s', '%s', '%d', '%s', '%s' ]
+		);
+
+		if ( ! $inserted ) {
+			$wpdb->query('ROLLBACK');
+			return false;
+		}
+
+		$payment_id = (int) $wpdb->insert_id;
+
+		// Recalculate invoice status
+		$invoice = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . self::fee_invoices_table() . " WHERE id = %d FOR UPDATE", $invoice_id ), ARRAY_A );
+		if ( $invoice ) {
+			$total_paid = (float) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(paid_amount) FROM " . self::fee_payments_table() . " WHERE invoice_id = %d", $invoice_id ) );
+			$net_due    = (float) $invoice['amount_due'] + (float) $invoice['fine'] - (float) $invoice['discount'];
+			
+			$new_status = 'unpaid';
+			if ( $total_paid >= $net_due ) {
+				$new_status = 'paid';
+			} elseif ( $total_paid > 0 ) {
+				$new_status = 'partial';
+			}
+
+			$wpdb->update(
+				self::fee_invoices_table(),
+				[ 'status' => $new_status ],
+				[ 'id' => $invoice_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+		}
+
+		$wpdb->query('COMMIT');
+
+		return $payment_id;
 	}
 
 	/**

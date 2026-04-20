@@ -25,6 +25,10 @@ class Activator {
 		Roles::add();
 		// Create default pages with shortcodes.
 		self::create_default_pages();
+
+		// Schedule cron events
+		FeesCron::schedule_events();
+
 		// Store activation timestamp for admin notices / onboarding.
 		if ( ! get_option( 'noor_tms_activated_at' ) ) {
 			add_option( 'noor_tms_activated_at', current_time( 'mysql' ) );
@@ -64,6 +68,10 @@ class Activator {
 			'tms-attendance' => [
 				'title'   => 'TMS Attendance',
 				'content' => '[noor_tms_attendance]',
+			],
+			'tms-fees'       => [
+				'title'   => 'TMS Fees',
+				'content' => '[noor_tms_fees]',
 			],
 		];
 

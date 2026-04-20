@@ -35,45 +35,73 @@ if ( 'added' === $msg ) {
 ?>
 
 <!-- Filter bar -->
-<form method="get" action="<?php echo esc_url( home_url( '/tms-students/' ) ); ?>">
-	<div class="noor-filter-row">
-		<input type="search" name="s"
-			   value="<?php echo esc_attr( $search ); ?>"
-			   placeholder="<?php esc_attr_e( 'Search by name…', 'noor-tms' ); ?>" />
+<div class="noor-filter-row">
+	<input type="search" id="noor_search_input"
+		   value="<?php echo esc_attr( $search ); ?>"
+		   placeholder="<?php esc_attr_e( 'Search by name…', 'noor-tms' ); ?>" />
 
-		<select name="class_id">
-			<option value=""><?php esc_html_e( 'All Classes', 'noor-tms' ); ?></option>
-			<?php foreach ( $classes as $cls ) : ?>
-				<option value="<?php echo esc_attr( $cls['id'] ); ?>"
-					<?php selected( $class_id, (int) $cls['id'] ); ?>>
-					<?php echo esc_html( $cls['name'] ); ?>
-				</option>
-			<?php endforeach; ?>
-		</select>
+	<select id="noor_class_id">
+		<option value=""><?php esc_html_e( 'All Classes', 'noor-tms' ); ?></option>
+		<?php foreach ( $classes as $cls ) : ?>
+			<option value="<?php echo esc_attr( $cls['id'] ); ?>"
+				<?php selected( $class_id, (int) $cls['id'] ); ?>>
+				<?php echo esc_html( $cls['name'] ); ?>
+			</option>
+		<?php endforeach; ?>
+	</select>
 
-		<select name="status_filter">
-			<option value=""><?php esc_html_e( 'All Statuses', 'noor-tms' ); ?></option>
-			<?php
-			foreach ( [
-				'active'    => __( 'Active',    'noor-tms' ),
-				'inactive'  => __( 'Inactive',  'noor-tms' ),
-				'graduated' => __( 'Graduated', 'noor-tms' ),
-			] as $val => $lbl ) {
-				printf(
-					'<option value="%s"%s>%s</option>',
-					esc_attr( $val ),
-					selected( $status, $val, false ),
-					esc_html( $lbl )
-				);
-			}
-			?>
-		</select>
+	<select id="noor_status_filter">
+		<option value=""><?php esc_html_e( 'All Statuses', 'noor-tms' ); ?></option>
+		<?php
+		foreach ( [
+			'active'    => __( 'Active',    'noor-tms' ),
+			'inactive'  => __( 'Inactive',  'noor-tms' ),
+			'graduated' => __( 'Graduated', 'noor-tms' ),
+		] as $val => $lbl ) {
+			printf(
+				'<option value="%s"%s>%s</option>',
+				esc_attr( $val ),
+				selected( $status, $val, false ),
+				esc_html( $lbl )
+			);
+		}
+		?>
+	</select>
 
-		<button type="submit" class="noor-btn noor-btn--secondary">
-			<?php esc_html_e( 'Filter', 'noor-tms' ); ?>
-		</button>
-	</div>
-</form>
+	<button type="button" class="noor-btn noor-btn--secondary" onclick="applyNoorStudentFilter();">
+		<?php esc_html_e( 'Filter', 'noor-tms' ); ?>
+	</button>
+</div>
+
+<script>
+function applyNoorStudentFilter() {
+	const url = new URL(window.location.href);
+	
+	// Clean existing parameters
+	url.searchParams.delete('noor_search');
+	url.searchParams.delete('s');
+	url.searchParams.delete('class_id');
+	url.searchParams.delete('status_filter');
+	url.searchParams.delete('paged');
+	
+	const search = document.getElementById('noor_search_input').value.trim();
+	const classId = document.getElementById('noor_class_id').value;
+	const status = document.getElementById('noor_status_filter').value;
+	
+	if (search) url.searchParams.set('noor_search', search);
+	if (classId) url.searchParams.set('class_id', classId);
+	if (status) url.searchParams.set('status_filter', status);
+	
+	window.location.href = url.toString();
+}
+
+document.getElementById('noor_search_input').addEventListener('keypress', function(e) {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		applyNoorStudentFilter();
+	}
+});
+</script>
 
 <?php if ( empty( $students ) ) : ?>
 	<div class="noor-empty">

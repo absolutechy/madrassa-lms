@@ -22,6 +22,7 @@ class Deactivator {
 	 */
 	public static function deactivate(): void {
 		Roles::remove();
+		FeesCron::clear_events();
 		flush_rewrite_rules();
 	}
 }

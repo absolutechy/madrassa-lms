@@ -105,6 +105,13 @@ final class Plugin {
 		$this->loader->add_action( 'admin_post_noor_tms_save_class',    $public, 'process_class_form' );
 		$this->loader->add_action( 'admin_post_noor_tms_save_settings', $public, 'process_settings_form' );
 		$this->loader->add_action( 'admin_post_noor_tms_save_teacher',  $public, 'process_teacher_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_record_payment', $public, 'process_fee_payment_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_create_fee_structure', $public, 'process_fee_structure_form' );
+		$this->loader->add_action( 'admin_post_noor_tms_delete_fee_structure', $public, 'process_delete_fee_structure' );
+		$this->loader->add_action( 'admin_post_noor_tms_generate_frontend_invoices', $public, 'process_frontend_invoices_generation' );
+
+		// Cron
+		$this->loader->add_action( 'noor_tms_generate_monthly_invoices', new \Noor_TMS\Includes\FeesCron(), 'generate_monthly_invoices' );
 	}
 
 	// -----------------------------------------------------------------------

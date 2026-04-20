@@ -52,6 +52,11 @@ if ( $is_manager ) {
 		'label' => __( 'Teachers',  'noor-tms' ),
 		'url'   => home_url( '/tms-teachers/' ),
 	];
+	$nav_items['fees'] = [
+		'icon'  => '&#128176;',
+		'label' => __( 'Fees',      'noor-tms' ),
+		'url'   => home_url( '/tms-fees/' ),
+	];
 	/*
 	$nav_items['settings'] = [
 		'icon'  => '&#9881;',
@@ -96,14 +101,5 @@ if ( $is_manager ) {
 	     Main Area
 	     ================================================================ -->
 	<div class="noor-tms-main">
-
-		<div class="noor-tms-topbar">
-			<h1><?php echo esc_html( $page_title ?? '' ); ?></h1>
-			<?php if ( ! empty( $topbar_actions ) ) : ?>
-				<div class="noor-tms-topbar__actions">
-					<?php echo $topbar_actions; // phpcs:ignore WordPress.Security.EscapeOutput ?>
-				</div>
-			<?php endif; ?>
-		</div>
 
 		<div class="noor-tms-content">

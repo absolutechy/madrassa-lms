@@ -44,6 +44,7 @@ class PublicController {
 		add_shortcode( 'noor_tms_teachers',   [ $this, 'sc_teachers' ] );
 		add_shortcode( 'noor_tms_settings',   [ $this, 'sc_settings' ] );
 		add_shortcode( 'noor_tms_attendance', [ $this, 'sc_attendance' ] );
+		add_shortcode( 'noor_tms_fees',       [ $this, 'sc_fees' ] );
 
 		// Provide hook points for front-end teacher creation UI.
 		add_action( 'noor_tms_teacher_handle_wp_user_fields', [ $this, 'handle_wp_user_fields' ], 10, 0 );
@@ -64,6 +65,7 @@ class PublicController {
 			'noor_tms_classes', 'noor_tms_results',
 			'noor_tms_teachers',
 			'noor_tms_settings', 'noor_tms_attendance',
+			'noor_tms_fees',
 		];
 
 		$found = false;
@@ -248,7 +250,7 @@ class PublicController {
 			$classes = DatabaseHandler::get_classes_dropdown();
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/student-form.php';
 		} else {
-			$search   = sanitize_text_field( $_GET['s']             ?? '' );
+			$search   = sanitize_text_field( $_GET['noor_search'] ?? ($_GET['s'] ?? '') );
 			$status   = sanitize_key( $_GET['status_filter']        ?? '' );
 			$class_id = (int) ( $_GET['class_id']                   ?? 0 );
 			$paged    = max( 1, (int) ( $_GET['paged']              ?? 1 ) );
@@ -451,6 +453,22 @@ class PublicController {
 
 		ob_start();
 		include NOOR_TMS_PLUGIN_DIR . 'public/templates/teachers.php';
+		return ob_get_clean();
+	}
+
+	/**
+	 * [noor_tms_fees] – Student fee management & payments.
+	 */
+	public function sc_fees(): string {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_safe_redirect( home_url( '/tms-login/' ) );
+			exit;
+		}
+
+		$action = sanitize_key( $_GET['tms_action'] ?? 'dashboard' );
+
+		ob_start();
+		include NOOR_TMS_PLUGIN_DIR . 'public/templates/fees.php';
 		return ob_get_clean();
 	}
 
@@ -737,6 +755,101 @@ class PublicController {
 		}
 
 		wp_safe_redirect( add_query_arg( 'msg', $msg, home_url( '/tms-students/' ) ) );
+		exit;
+	}
+
+	/**
+	 * Process Fee Payment Form
+	 */
+	public function process_fee_payment_form(): void {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_die( 'Unauthorized.' );
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['noor_tms_payment_nonce'] ?? '' ) ), 'noor_tms_record_payment' ) ) {
+			wp_die( 'Invalid nonce.' );
+		}
+
+		$student_id = (int) ( $_POST['student_id'] ?? 0 );
+		$invoice_id = (int) ( $_POST['invoice_id'] ?? 0 );
+		$amount     = (float) ( $_POST['paid_amount'] ?? 0 );
+		$method     = sanitize_text_field( $_POST['payment_method'] ?? 'cash' );
+		$date       = sanitize_text_field( $_POST['payment_date'] ?? current_time( 'Y-m-d' ) );
+		$remarks    = sanitize_text_field( $_POST['remarks'] ?? '' );
+		$received_by = get_current_user_id();
+
+		if ( $invoice_id > 0 && $amount > 0 ) {
+			\Noor_TMS\Includes\DatabaseHandler::add_fee_payment( $invoice_id, $amount, $date, $method, $received_by, $remarks );
+		}
+
+		wp_safe_redirect( home_url( '/tms-fees/?tms_action=payments&success=1&student_id=' . $student_id ) );
+		exit;
+	}
+
+	/**
+	 * Process Create / Update Fee Structure Form
+	 */
+	public function process_fee_structure_form(): void {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_die( 'Unauthorized.' );
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['noor_tms_create_fee_nonce'] ?? '' ) ), 'noor_tms_create_fee_structure' ) ) {
+			wp_die( 'Invalid nonce.' );
+		}
+
+		$structure_id   = (int) ( $_POST['structure_id'] ?? 0 );
+		$title          = sanitize_text_field( $_POST['fee_title'] ?? '' );
+		$class_id       = (int) ( $_POST['class_id'] ?? 0 );
+		$amount         = (float) ( $_POST['fee_amount'] ?? 0 );
+		$frequency      = sanitize_text_field( $_POST['fee_frequency'] ?? 'monthly' );
+		$effective_from = sanitize_text_field( $_POST['effective_from'] ?? current_time( 'Y-m' ) );
+
+		if ( ! empty( $title ) && $amount > 0 ) {
+			if ( $structure_id > 0 ) {
+				\Noor_TMS\Includes\DatabaseHandler::update_fee_structure( $structure_id, $class_id, $title, $amount, $frequency, $effective_from );
+			} else {
+				\Noor_TMS\Includes\DatabaseHandler::insert_fee_structure( $class_id, $title, $amount, $frequency, $effective_from );
+			}
+		}
+
+		wp_safe_redirect( home_url( '/tms-fees/?tms_action=structures&added=1' ) );
+		exit;
+	}
+
+	/**
+	 * Process Delete Fee Structure Form
+	 */
+	public function process_delete_fee_structure(): void {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_die( 'Unauthorized.' );
+		}
+
+		$structure_id = (int) ( $_GET['structure_id'] ?? 0 );
+		if ( $structure_id > 0 && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( $_GET['_wpnonce'], 'delete_fee_structure_' . $structure_id ) ) {
+			\Noor_TMS\Includes\DatabaseHandler::delete_fee_structure( $structure_id );
+		}
+
+		wp_safe_redirect( home_url( '/tms-fees/?tms_action=structures&deleted=1' ) );
+		exit;
+	}
+
+	/**
+	 * Process frontend manual trigger for generating missing invoices via cron logic.
+	 */
+	public function process_frontend_invoices_generation(): void {
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_die( 'Unauthorized.' );
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) ), 'noor_tms_trigger_invoices' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'noor-tms' ) );
+		}
+
+		// Run the exact same method the background cron runs.
+		\Noor_TMS\Includes\FeesCron::generate_monthly_invoices();
+
+		wp_safe_redirect( home_url( '/tms-fees/?tms_action=structures&invoices_generated=1' ) );
 		exit;
 	}
 
