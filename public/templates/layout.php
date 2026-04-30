@@ -103,4 +103,13 @@ if ( $is_manager ) {
 	     ================================================================ -->
 	<div class="noor-tms-main">
 
+		<div class="noor-tms-topbar">
+			<h1><?php echo esc_html( $page_title ?? '' ); ?></h1>
+			<?php if ( ! empty( $topbar_actions ) ) : ?>
+				<div class="noor-tms-topbar__actions">
+					<?php echo $topbar_actions; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				</div>
+			<?php endif; ?>
+		</div>
+
 		<div class="noor-tms-content">

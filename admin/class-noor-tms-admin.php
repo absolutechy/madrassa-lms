@@ -267,6 +267,104 @@ class Admin {
 		$this->teachers->ajax_save_teacher_attendance();
 	}
 
+	// -----------------------------------------------------------------------
+	// Admin live-chat AJAX handlers
+	// -----------------------------------------------------------------------
+
+	/**
+	 * AJAX: Fetch new messages for the active admin chat thread.
+	 * Accepts: thread_id, after_id.  Returns: messages[].
+	 */
+	public function ajax_admin_chat_fetch(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_send_json_error( null, 403 );
+		}
+
+		$thread_id = (int) ( $_POST['thread_id'] ?? 0 );
+		$after_id  = max( 0, (int) ( $_POST['after_id'] ?? 0 ) );
+
+		if ( $thread_id <= 0 ) {
+			wp_send_json_error( null, 400 );
+		}
+
+		$rows = \Noor_TMS\Includes\DatabaseHandler::get_chat_messages( $thread_id, $after_id, 50 );
+
+		$messages = array_map(
+			static function ( array $row ): array {
+				return [
+					'id'           => (int) $row['id'],
+					'sender_role'  => sanitize_key( (string) ( $row['sender_role'] ?? 'visitor' ) ),
+					'message_text' => wp_kses_post( (string) ( $row['message_text'] ?? '' ) ),
+					'created_at'   => (string) ( $row['created_at'] ?? '' ),
+				];
+			},
+			$rows
+		);
+
+		wp_send_json_success( [ 'messages' => $messages ] );
+	}
+
+	/**
+	 * AJAX: Send an agent reply from the admin inbox (replaces the form-POST path).
+	 * Accepts: thread_id, message.  Returns: message{}.
+	 */
+	public function ajax_admin_chat_reply(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_send_json_error( null, 403 );
+		}
+
+		$thread_id = (int) ( $_POST['thread_id'] ?? 0 );
+		$message   = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
+
+		if ( $thread_id <= 0 || '' === $message ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid request.', 'noor-tms' ) ], 400 );
+		}
+
+		$msg_id = \Noor_TMS\Includes\DatabaseHandler::insert_chat_message(
+			$thread_id, 'agent', $message, get_current_user_id()
+		);
+
+		if ( ! $msg_id ) {
+			wp_send_json_error( [ 'message' => __( 'Failed to send reply.', 'noor-tms' ) ], 500 );
+		}
+
+		\Noor_TMS\Includes\DatabaseHandler::update_chat_thread_status( $thread_id, 'in_progress' );
+		do_action( 'noor_tms_chat_message_sent', $thread_id, 'agent', $message, get_current_user_id() );
+
+		wp_send_json_success( [
+			'message' => [
+				'id'           => (int) $msg_id,
+				'sender_role'  => 'agent',
+				'message_text' => $message,
+				'created_at'   => current_time( 'mysql' ),
+			],
+		] );
+	}
+
+	/**
+	 * AJAX: Count threads that received new messages after a given timestamp.
+	 * Used to show the "new conversations" badge in the sidebar.
+	 * Accepts: since (MySQL datetime), thread_id (exclude current thread).
+	 */
+	public function ajax_admin_chat_ping(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+			wp_send_json_error( null, 403 );
+		}
+
+		$since     = sanitize_text_field( wp_unslash( $_POST['since'] ?? '' ) );
+		$thread_id = (int) ( $_POST['thread_id'] ?? 0 );
+
+		$count = \Noor_TMS\Includes\DatabaseHandler::count_threads_updated_since( $since, $thread_id );
+
+		wp_send_json_success( [ 'new_thread_count' => $count ] );
+	}
+
 	public function handle_print_student(): void {
 		$this->students->handle_print_student();
 	}

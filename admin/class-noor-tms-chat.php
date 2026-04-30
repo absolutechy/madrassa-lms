@@ -49,6 +49,8 @@ class Chat {
 
 		$active_thread   = $thread_id > 0 ? DatabaseHandler::get_chat_thread( $thread_id ) : null;
 		$active_messages = $active_thread ? DatabaseHandler::get_chat_messages( (int) $active_thread['id'], 0, 250 ) : [];
+		$last_message_id = ! empty( $active_messages ) ? (int) end( $active_messages )['id'] : 0;
+		reset( $active_messages );
 		?>
 		<div class="wrap noor-tms-wrap noor-chat-admin">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Live Chat Inbox', 'noor-tms' ); ?></h1>
@@ -161,10 +163,11 @@ class Chat {
 										? __( 'Agent', 'noor-tms' )
 										: ( $is_system ? __( 'System', 'noor-tms' ) : __( 'Visitor', 'noor-tms' ) );
 									?>
-									<div class="noor-chat-admin-message <?php echo $is_agent ? 'is-agent' : ( $is_system ? 'is-system' : 'is-visitor' ); ?>">
-										<div class="noor-chat-admin-message__meta"><?php echo esc_html( $role_label ); ?> • <?php echo esc_html( mysql2date( 'Y-m-d H:i', (string) $msg['created_at'] ) ); ?></div>
-										<div class="noor-chat-admin-message__text"><?php echo nl2br( esc_html( (string) ( $msg['message_text'] ?? '' ) ) ); ?></div>
-									</div>
+								<div class="noor-chat-admin-message <?php echo $is_agent ? 'is-agent' : ( $is_system ? 'is-system' : 'is-visitor' ); ?>"
+									data-msg-id="<?php echo (int) $msg['id']; ?>">
+									<div class="noor-chat-admin-message__meta"><?php echo esc_html( $role_label ); ?> • <?php echo esc_html( mysql2date( 'Y-m-d H:i', (string) $msg['created_at'] ) ); ?></div>
+									<div class="noor-chat-admin-message__text"><?php echo nl2br( esc_html( (string) ( $msg['message_text'] ?? '' ) ) ); ?></div>
+								</div>
 								<?php endforeach; ?>
 							<?php endif; ?>
 						</div>
@@ -180,6 +183,201 @@ class Chat {
 				</section>
 			</div>
 		</div>
+
+		<?php if ( $active_thread ) : ?>
+		<script>
+		/* global jQuery */
+		( function ( $ ) {
+			'use strict';
+
+			// ── Config ────────────────────────────────────────────────────────
+			const THREAD_ID    = <?php echo (int) $active_thread['id']; ?>;
+			const AJAX_URL     = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+			const NONCE        = <?php echo wp_json_encode( wp_create_nonce( 'noor_tms_ajax' ) ); ?>;
+			const LOADED_AT    = <?php echo wp_json_encode( current_time( 'mysql' ) ); ?>;
+			const POLL_MS      = 5000;   // message poll interval
+			const PING_MS      = 20000;  // thread-list ping interval
+
+			// ── State ─────────────────────────────────────────────────────────
+			let lastMsgId        = <?php echo (int) $last_message_id; ?>;
+			let isFetching       = false;
+			let isSending        = false;
+			let badgeShown       = false;
+			let titleFlashTimer  = null;
+			const originalTitle  = document.title;
+
+			// ── Helpers ───────────────────────────────────────────────────────
+			function escHtml( str ) {
+				return String( str )
+					.replace( /&/g,  '&amp;'  )
+					.replace( /</g,  '&lt;'   )
+					.replace( />/g,  '&gt;'   )
+					.replace( /"/g,  '&quot;' )
+					.replace( /'/g,  '&#039;' );
+			}
+
+			function scrollToBottom() {
+				const el = document.querySelector( '.noor-chat-admin-messages' );
+				if ( el ) { el.scrollTop = el.scrollHeight; }
+			}
+
+			function flashTitle( msg ) {
+				if ( titleFlashTimer ) { return; }
+				titleFlashTimer = setInterval( function () {
+					document.title = ( document.title === originalTitle ) ? msg : originalTitle;
+				}, 1500 );
+				$( window ).one( 'focus', function () {
+					clearInterval( titleFlashTimer );
+					titleFlashTimer = null;
+					document.title  = originalTitle;
+				} );
+			}
+
+			// ── Append messages ───────────────────────────────────────────────
+			function appendMessages( messages ) {
+				if ( ! messages || ! messages.length ) { return; }
+
+				const $container    = $( '.noor-chat-admin-messages' );
+				let   hasNewVisitor = false;
+
+				messages.forEach( function ( msg ) {
+					const id = Number( msg.id || 0 );
+					if ( ! id ) { return; }
+
+					// Skip if already rendered.
+					if ( $container.find( '[data-msg-id="' + id + '"]' ).length ) {
+						if ( id > lastMsgId ) { lastMsgId = id; }
+						return;
+					}
+
+					const role      = String( msg.sender_role || 'visitor' );
+					const cssRole   = role === 'agent'  ? 'is-agent'
+					                : role === 'system' ? 'is-system'
+					                :                     'is-visitor';
+					const roleLabel = role === 'agent'  ? 'Agent'
+					                : role === 'system' ? 'System'
+					                :                     'Visitor';
+					const time      = String( msg.created_at || '' ).slice( 0, 16 ).replace( 'T', ' ' );
+					const text      = escHtml( msg.message_text || '' ).replace( /\n/g, '<br>' );
+
+					$container.append(
+						'<div class="noor-chat-admin-message ' + cssRole + '" data-msg-id="' + id + '">' +
+							'<div class="noor-chat-admin-message__meta">' + escHtml( roleLabel ) + ' &bull; ' + escHtml( time ) + '</div>' +
+							'<div class="noor-chat-admin-message__text">' + text + '</div>' +
+						'</div>'
+					);
+
+					if ( id > lastMsgId ) { lastMsgId = id; }
+					if ( role === 'visitor' ) { hasNewVisitor = true; }
+				} );
+
+				scrollToBottom();
+
+				if ( hasNewVisitor && ! document.hasFocus() ) {
+					flashTitle( '💬 New message!' );
+				}
+			}
+
+			// ── Message polling ───────────────────────────────────────────────
+			function fetchNewMessages() {
+				if ( isFetching ) { return; }
+				isFetching = true;
+
+				$.post( AJAX_URL, {
+					action:    'noor_tms_admin_chat_fetch',
+					nonce:     NONCE,
+					thread_id: THREAD_ID,
+					after_id:  lastMsgId,
+				} )
+				.done( function ( r ) {
+					if ( r && r.success && r.data && r.data.messages ) {
+						appendMessages( r.data.messages );
+					}
+				} )
+				.always( function () { isFetching = false; } );
+			}
+
+			// ── Thread-list ping ─────────────────────────────────────────────
+			function pingThreadList() {
+				$.post( AJAX_URL, {
+					action:    'noor_tms_admin_chat_ping',
+					nonce:     NONCE,
+					since:     LOADED_AT,
+					thread_id: THREAD_ID,
+				} )
+				.done( function ( r ) {
+					if ( r && r.success && r.data && r.data.new_thread_count > 0 ) {
+						showThreadBadge( r.data.new_thread_count );
+					}
+				} );
+			}
+
+			function showThreadBadge( count ) {
+				if ( badgeShown ) { return; }
+				badgeShown = true;
+
+				const $aside = $( '.noor-chat-admin-list' );
+				const label  = count + ' new conversation' + ( count !== 1 ? 's' : '' );
+				const $badge = $(
+					'<div style="' +
+						'background:#2271b1;color:#fff;padding:8px 12px;border-radius:4px;' +
+						'margin-bottom:10px;font-size:13px;cursor:pointer;' +
+					'">' +
+						'&#128172; ' + escHtml( label ) + ' — click to refresh' +
+					'</div>'
+				).on( 'click', function () { window.location.reload(); } );
+
+				$aside.prepend( $badge );
+				flashTitle( '💬 New chat!' );
+			}
+
+			// ── AJAX reply (replaces the full-page form POST) ─────────────────
+			const $replyForm     = $( '.noor-chat-admin-reply' );
+			const $replyTextarea = $replyForm.find( 'textarea[name="reply_message"]' );
+			const $replyBtn      = $replyForm.find( 'button[type="submit"]' );
+
+			$replyForm.on( 'submit', function ( e ) {
+				e.preventDefault();
+
+				const message = $.trim( $replyTextarea.val() );
+				if ( ! message || isSending ) { return; }
+
+				isSending = true;
+				$replyBtn.prop( 'disabled', true ).text( '<?php echo esc_js( __( 'Sending…', 'noor-tms' ) ); ?>' );
+
+				$.post( AJAX_URL, {
+					action:    'noor_tms_admin_chat_reply',
+					nonce:     NONCE,
+					thread_id: THREAD_ID,
+					message:   message,
+				} )
+				.done( function ( r ) {
+					if ( r && r.success && r.data && r.data.message ) {
+						appendMessages( [ r.data.message ] );
+						$replyTextarea.val( '' ).trigger( 'focus' );
+					} else {
+						const errMsg = ( r && r.data && r.data.message ) ? r.data.message : '<?php echo esc_js( __( 'An error occurred.', 'noor-tms' ) ); ?>';
+						window.alert( errMsg );
+					}
+				} )
+				.fail( function () {
+					window.alert( '<?php echo esc_js( __( 'Network error. Please try again.', 'noor-tms' ) ); ?>' );
+				} )
+				.always( function () {
+					isSending = false;
+					$replyBtn.prop( 'disabled', false ).text( '<?php echo esc_js( __( 'Send Reply', 'noor-tms' ) ); ?>' );
+				} );
+			} );
+
+			// ── Kick-off ──────────────────────────────────────────────────────
+			scrollToBottom();
+
+			setInterval( fetchNewMessages, POLL_MS );
+			setInterval( pingThreadList,   PING_MS );
+
+		} )( jQuery );
+		</script>
+		<?php endif; ?>
 		<?php
 	}
 

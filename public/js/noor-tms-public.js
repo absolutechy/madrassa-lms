@@ -585,6 +585,13 @@
                 if ( ! response || ! response.success || ! response.data || ! response.data.thread ) {
                     if ( ! silent ) {
                         setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                    } else {
+                        // Silent resume failed — the saved session no longer exists in the DB.
+                        // Reset state so the next identity-form submit starts a brand-new thread.
+                        chatState.threadId      = 0;
+                        chatState.visitorToken  = '';
+                        chatState.isBootstrapped = false;
+                        clearChatStorage();
                     }
                     return;
                 }
@@ -612,6 +619,11 @@
             .fail( function () {
                 if ( ! silent ) {
                     setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                } else {
+                    chatState.threadId      = 0;
+                    chatState.visitorToken  = '';
+                    chatState.isBootstrapped = false;
+                    clearChatStorage();
                 }
             } )
             .always( function () {
@@ -702,7 +714,16 @@
             } )
             .fail( function ( xhr ) {
                 if ( xhr && xhr.status === 404 ) {
+                    // Session gone from server — wipe everything so the widget
+                    // resets to the identity form instead of polling forever.
                     clearChatStorage();
+                    chatState.threadId       = 0;
+                    chatState.visitorToken   = '';
+                    chatState.isBootstrapped = false;
+                    if ( chatState.pollTimer ) {
+                        window.clearInterval( chatState.pollTimer );
+                        chatState.pollTimer = null;
+                    }
                 }
             } )
             .always( function () {

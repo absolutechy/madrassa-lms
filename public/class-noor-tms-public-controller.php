@@ -1104,6 +1104,11 @@ class PublicController {
 		$frequency      = sanitize_text_field( $_POST['fee_frequency'] ?? 'monthly' );
 		$effective_from = sanitize_text_field( $_POST['effective_from'] ?? current_time( 'Y-m' ) );
 
+		// <input type="month"> returns 'YYYY-MM'; the DB column is DATE and needs 'YYYY-MM-DD'.
+		if ( preg_match( '/^\d{4}-\d{2}$/', $effective_from ) ) {
+			$effective_from .= '-01';
+		}
+
 		if ( ! empty( $title ) && $amount > 0 ) {
 			if ( $structure_id > 0 ) {
 				\Noor_TMS\Includes\DatabaseHandler::update_fee_structure( $structure_id, $class_id, $title, $amount, $frequency, $effective_from );

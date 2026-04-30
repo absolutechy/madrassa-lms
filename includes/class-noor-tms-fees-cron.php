@@ -24,32 +24,86 @@ class FeesCron {
 	public static function generate_monthly_invoices(): void {
 		global $wpdb;
 
-		$today            = current_time( 'Y-m-d' );
-		$current_month    = current_time( 'Y-m' );
-		$academic_year    = date( 'Y' );
-		$due_date         = date( 'Y-m-d', strtotime( date( 'Y-m-01' ) . ' + 9 days' ) );
+		$today         = current_time( 'Y-m-d' );
+		$current_month = current_time( 'Y-m' ); // e.g. '2026-04'
+		$academic_year = date( 'Y' );
 
-		// Use single INSERT...SELECT for better performance and reliability
-		$inserted = $wpdb->query( $wpdb->prepare(
-			"INSERT INTO " . DatabaseHandler::fee_invoices_table() . " 
-			 (student_id, fee_structure_id, invoice_month, academic_year, due_date, amount_due, status, created_at)
-			 SELECT s.id, fs.id, %s, %s, %s, fs.amount, 'unpaid', NOW()
-			 FROM " . DatabaseHandler::students_table() . " s
-			 INNER JOIN " . DatabaseHandler::fee_structure_table() . " fs 
-			   ON ( fs.class_id = 0 OR fs.class_id = s.class_id )
-			 WHERE fs.frequency IN ('monthly', 'one-time') 
-			   AND s.status = 'active'
-			   AND NOT EXISTS (
-			       SELECT 1 FROM " . DatabaseHandler::fee_invoices_table() . " 
-			       WHERE student_id = s.id AND fee_structure_id = fs.id AND invoice_month = %s
-			   )",
-			$current_month, $academic_year, $due_date, $current_month
-		) );
+		$inv = DatabaseHandler::fee_invoices_table();
+		$stu = DatabaseHandler::students_table();
+		$fs  = DatabaseHandler::fee_structure_table();
 
-		if ( $inserted ) {
-			error_log( "[Noor-TMS] Invoice generation complete. Inserted {$inserted} invoices." );
+		/*
+		 * Repair any existing fee structures where effective_from was stored as a
+		 * partial date ('YYYY-MM' or '0000-00-00') due to the HTML month input bug.
+		 * Safe to run every time — only touches rows that need fixing.
+		 */
+		$wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"UPDATE {$fs}
+			    SET effective_from = CONCAT( LEFT(effective_from, 7), '-01' )
+			  WHERE DAY(effective_from) = 0
+			     OR effective_from = '0000-00-00'"
+		);
+
+		/*
+		 * Find the earliest effective_from across all monthly/one-time structures.
+		 * We fetch raw DATE strings from PHP and take the first 7 chars ('YYYY-MM')
+		 * so the result is reliable regardless of MySQL mode or zero-day storage
+		 * ('2026-02', '2026-02-00', '2026-02-01' all give '2026-02').
+		 */
+		$raw_dates = $wpdb->get_col( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"SELECT effective_from FROM {$fs} WHERE frequency IN ('monthly','one-time')"
+		);
+
+		$start_month = $current_month;
+		foreach ( $raw_dates as $raw ) {
+			$eff = substr( (string) $raw, 0, 7 ); // 'YYYY-MM'
+			// Skip obviously invalid/zero dates.
+			if ( $eff >= '2000-01' && $eff < $start_month ) {
+				$start_month = $eff;
+			}
+		}
+
+		$total_inserted = 0;
+		$month          = $start_month;
+
+		while ( $month <= $current_month ) {
+			$due_date = date( 'Y-m-d', strtotime( $month . '-01 +9 days' ) );
+
+			/*
+			 * LEFT(fees.effective_from, 7) gives 'YYYY-MM' for any storage format
+			 * ('2026-02', '2026-02-00', '2026-02-01') and supports simple string <=
+			 * comparison — no YEAR() / MONTH() / DATE_FORMAT() needed.
+			 */
+			$inserted = $wpdb->query( $wpdb->prepare(
+				"INSERT INTO {$inv}
+				 (student_id, fee_structure_id, invoice_month, academic_year, due_date, amount_due, status, created_at)
+				 SELECT s.id, fees.id, %s, %s, %s, fees.amount, 'unpaid', NOW()
+				   FROM {$stu} s
+				  INNER JOIN {$fs} fees
+				     ON ( fees.class_id = 0 OR fees.class_id = s.class_id )
+				  WHERE fees.frequency IN ('monthly','one-time')
+				    AND s.status = 'active'
+				    AND LEFT(fees.effective_from, 7) <= %s
+				    AND NOT EXISTS (
+				        SELECT 1
+				          FROM {$inv}
+				         WHERE student_id      = s.id
+				           AND fee_structure_id = fees.id
+				           AND invoice_month    = %s
+				    )",
+				$month, $academic_year, $due_date, $month, $month
+			) );
+
+			$total_inserted += (int) $inserted;
+
+			// Advance to next calendar month (handles Dec → Jan roll-over).
+			$month = date( 'Y-m', strtotime( $month . '-01 +1 month' ) );
+		}
+
+		if ( $total_inserted > 0 ) {
+			error_log( "[Noor-TMS] Invoice backfill complete. Inserted {$total_inserted} invoices across all missing months." );
 		} else {
-			error_log( '[Noor-TMS] No invoices were created or all eligible invoices already exist.' );
+			error_log( '[Noor-TMS] No new invoices created — all eligible months already have invoices.' );
 		}
 
 		self::update_late_fines( $today );

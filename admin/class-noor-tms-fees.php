@@ -80,6 +80,10 @@ class Fees {
 			$amount   = (float) $_POST['amount'];
 			$freq     = sanitize_text_field( $_POST['frequency'] );
 			$from     = sanitize_text_field( $_POST['effective_from'] );
+			// type="month" returns 'YYYY-MM' — normalize to full DATE 'YYYY-MM-01'.
+			if ( preg_match( '/^\d{4}-\d{2}$/', $from ) ) {
+				$from .= '-01';
+			}
 			
 			if ( DatabaseHandler::insert_fee_structure( $class_id, $title, $amount, $freq, $from ) ) {
 				echo '<div class="notice notice-success inline"><p>Fee Structure created successfully.</p></div>';

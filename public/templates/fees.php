@@ -9,17 +9,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-// Re-use the existing layout.
+// Variables set in PublicController::sc_fees(): $action (dashboard|invoices|payments|defaulters|structures)
+$page_title = __( 'Fee Management', 'noor-tms' );
+$active_nav = 'fees';
+
 include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
-
-// Variables set in PublicController::sc_fees()
-// $action  (dashboard|invoices|payments|defaulters)
-?> 
-
-<div style="margin-bottom: 24px;">
-	<h1 style="margin: 0 0 4px; font-size: 24px; color: var(--tms-text);"><?php esc_html_e( 'Fee Management', 'noor-tms' ); ?></h1>
-	<p style="color: var(--tms-muted); margin: 0; font-size: 14px;"><?php esc_html_e( 'Manage student fees, invoices, payments, and view defaulters.', 'noor-tms' ); ?></p>
-</div>
+?>
 
 <!-- Tabs -->
 <div class="noor-tab-wrap" style="margin-bottom: 24px;">
@@ -65,79 +60,248 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 			</div>
 		</div>
 
-	<?php elseif ( 'invoices' === $action ) : ?>
-		<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+	<?php elseif ( 'invoices' === $action ) :
+		$inv_student_id = (int) ( $_GET['student_id'] ?? 0 );
+
+		if ( $inv_student_id > 0 ) :
+			// ── Detail view: all invoices for one student ────────────────────
+			$inv_student     = \Noor_TMS\Includes\DatabaseHandler::get_student( $inv_student_id );
+			$inv_detail_rows = \Noor_TMS\Includes\DatabaseHandler::get_invoices( [ 'student_id' => $inv_student_id ] );
+			$inv_summary     = \Noor_TMS\Includes\DatabaseHandler::get_student_fee_summary( $inv_student_id );
+			$inv_back_url    = add_query_arg( 'tms_action', 'invoices', home_url( '/tms-fees/' ) );
+		?>
+
+		<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
 			<div>
-				<h2 style="margin-top:0;"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></h2>
-				<p style="color: var(--tms-muted); margin-bottom: 0;"><?php esc_html_e( 'View and manage auto-generated fee invoices.', 'noor-tms' ); ?></p>
+				<a href="<?php echo esc_url( $inv_back_url ); ?>" class="noor-btn noor-btn--secondary noor-btn--sm" style="margin-bottom:8px;">
+					&larr; <?php esc_html_e( 'Back to Invoices', 'noor-tms' ); ?>
+				</a>
+				<h2 style="margin:0; font-size:20px;"><?php echo esc_html( $inv_student['name'] ?? __( 'Student', 'noor-tms' ) ); ?></h2>
+				<span style="color:var(--tms-muted); font-size:13px;"><?php echo esc_html( $inv_student['class_name'] ?? '' ); ?></span>
 			</div>
-			
-			<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
-				<input type="hidden" name="action" value="noor_tms_generate_frontend_invoices">
-				<?php wp_nonce_field( 'noor_tms_trigger_invoices' ); ?>
-				<button type="submit" class="noor-btn" style="background-color: var(--tms-link); color: #c36;"><?php esc_html_e( 'Generate Current Month Invoices ', 'noor-tms' ); ?></button>
-			</form>
+			<a href="<?php echo esc_url( add_query_arg( [ 'tms_action' => 'payments', 'student_id' => $inv_student_id ], home_url( '/tms-fees/' ) ) ); ?>"
+			   class="noor-btn noor-btn--success noor-btn--sm">
+				<?php esc_html_e( 'Record Payment', 'noor-tms' ); ?>
+			</a>
 		</div>
 
-		<?php if ( ! empty( $_GET['invoices_generated'] ) ) : ?>
-			<div class="noor-notice noor-notice--success" style="margin-bottom: 20px;">
-				<?php esc_html_e( 'Invoices successfully generated and assigned to all eligible active students.', 'noor-tms' ); ?>
+		<!-- Summary cards -->
+		<div class="noor-class-grid" style="margin-bottom:24px;">
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Total Billed', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-text); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $inv_summary['total_due'], 2 ) ); ?></h3>
 			</div>
-		<?php endif; ?>
-		
-		<?php
-		$invoices = \Noor_TMS\Includes\DatabaseHandler::get_invoices();
-		if ( empty( $invoices ) ) :
-			?>
-			<div class="noor-notice noor-notice--warning">
-				<?php esc_html_e( 'No invoices found.', 'noor-tms' ); ?>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Total Paid', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-pass); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $inv_summary['total_paid'], 2 ) ); ?></h3>
 			</div>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Balance', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-fail); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $inv_summary['balance'], 2 ) ); ?></h3>
+			</div>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-primary); margin:6px 0 0;">
+					<?php
+					printf(
+						/* translators: 1: paid 2: total */
+						esc_html__( '%1$d / %2$d paid', 'noor-tms' ),
+						(int) $inv_summary['paid_count'],
+						(int) $inv_summary['invoice_count']
+					);
+					?>
+				</h3>
+			</div>
+		</div>
+
+		<?php if ( empty( $inv_detail_rows ) ) : ?>
+			<div class="noor-notice noor-notice--warning"><?php esc_html_e( 'No invoices found for this student.', 'noor-tms' ); ?></div>
 		<?php else : ?>
-			<div class="noor-table-wrap" style="margin-top:16px;">
+			<div class="noor-table-wrap">
 				<table class="noor-table">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( '#', 'noor-tms' ); ?></th>
 							<th><?php esc_html_e( 'Month', 'noor-tms' ); ?></th>
-							<th><?php esc_html_e( 'Student', 'noor-tms' ); ?></th>
-							<th style="text-align:right;"><?php esc_html_e( 'Total Billed', 'noor-tms' ); ?></th>
-							<th style="text-align:right;"><?php esc_html_e( 'Balance Due', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Amount', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Fine', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Discount', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Net Due', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Paid', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Balance', 'noor-tms' ); ?></th>
 							<th style="text-align:center;"><?php esc_html_e( 'Status', 'noor-tms' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $invoices as $invoice ) : ?>
-							<tr>
-								<td>#<?php echo esc_html( $invoice['id'] ); ?></td>
-								<td><?php echo esc_html( gmdate( 'F Y', strtotime( $invoice['invoice_month'] . '-01' ) ) ); ?></td>
-								<td>
-									<div style="font-weight: 600; color: var(--tms-text);"><?php echo esc_html( $invoice['student_name'] ); ?></div>
-									<div style="font-size: 12px; color: var(--tms-muted); margin-top:2px;"><?php echo esc_html( $invoice['class_name'] ); ?></div>
-								</td>
-								<td style="font-weight: 500; text-align:right; color: var(--tms-text);">
-									<?php echo esc_html( number_format_i18n( (float) $invoice['net_due'], 2 ) ); ?>
-								</td>
-								<td style="font-weight: 500; text-align:right; color: var(--tms-text);">
-									<?php 
-										$balance = (float) $invoice['net_due'] - (float) $invoice['total_paid'];
-										echo esc_html( number_format_i18n( $balance, 2 ) );
-									?>
-								</td>
-								<td style="text-align:center;">
-									<?php if ( 'paid' === $invoice['status'] ) : ?>
-										<span class="noor-pct-pass">Paid</span>
-									<?php elseif ( 'partial' === $invoice['status'] ) : ?>
-										<span class="noor-badge" style="background:#fffbeb; color:#92400e;">Partial</span>
-									<?php else : ?>
-										<span class="noor-pct-fail">Unpaid</span>
-									<?php endif; ?>
-								</td>
-							</tr>
+						<?php foreach ( $inv_detail_rows as $inv_row ) :
+							$inv_net     = (float) $inv_row['net_due'];
+							$inv_paid    = (float) $inv_row['total_paid'];
+							$inv_balance = max( 0.0, $inv_net - $inv_paid );
+						?>
+						<tr>
+							<td style="font-weight:500;"><?php echo esc_html( gmdate( 'F Y', strtotime( $inv_row['invoice_month'] . '-01' ) ) ); ?></td>
+							<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (float) $inv_row['amount_due'], 2 ) ); ?></td>
+							<td style="text-align:right; color:var(--tms-fail);"><?php echo esc_html( number_format_i18n( (float) $inv_row['fine'], 2 ) ); ?></td>
+							<td style="text-align:right; color:var(--tms-pass);"><?php echo esc_html( number_format_i18n( (float) $inv_row['discount'], 2 ) ); ?></td>
+							<td style="text-align:right; font-weight:500;"><?php echo esc_html( number_format_i18n( $inv_net, 2 ) ); ?></td>
+							<td style="text-align:right; color:var(--tms-pass);"><?php echo esc_html( number_format_i18n( $inv_paid, 2 ) ); ?></td>
+							<td style="text-align:right; font-weight:600; color:<?php echo $inv_balance > 0 ? 'var(--tms-fail)' : 'var(--tms-pass)'; ?>;">
+								<?php echo esc_html( number_format_i18n( $inv_balance, 2 ) ); ?>
+							</td>
+							<td style="text-align:center;">
+								<?php if ( 'paid' === $inv_row['status'] ) : ?>
+									<span class="noor-pct-pass"><?php esc_html_e( 'Paid', 'noor-tms' ); ?></span>
+								<?php elseif ( 'partial' === $inv_row['status'] ) : ?>
+									<span class="noor-badge" style="background:#fffbeb; color:#92400e;"><?php esc_html_e( 'Partial', 'noor-tms' ); ?></span>
+								<?php else : ?>
+									<span class="noor-pct-fail"><?php esc_html_e( 'Unpaid', 'noor-tms' ); ?></span>
+								<?php endif; ?>
+							</td>
+						</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
 			</div>
 		<?php endif; ?>
+
+		<?php else :
+			// ── List view: one row per student ──────────────────────────────
+			$inv_search      = sanitize_text_field( $_GET['noor_search'] ?? '' );
+			$inv_paged       = max( 1, (int) ( $_GET['tms_page'] ?? 1 ) );
+			$inv_result      = \Noor_TMS\Includes\DatabaseHandler::get_invoices_by_student( [
+				'per_page' => 15,
+				'page'     => $inv_paged,
+				'search'   => $inv_search,
+			] );
+			$inv_rows        = $inv_result['rows'];
+			$inv_total       = $inv_result['total'];
+			$inv_total_pages = $inv_result['total_pages'];
+		?>
+
+		<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+			<div>
+				<h2 style="margin-top:0;"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></h2>
+				<p style="color:var(--tms-muted); margin-bottom:0;"><?php esc_html_e( 'One row per student — click a student to see their full invoice history.', 'noor-tms' ); ?></p>
+			</div>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="noor_tms_generate_frontend_invoices">
+				<?php wp_nonce_field( 'noor_tms_trigger_invoices' ); ?>
+				<button type="submit" class="noor-btn noor-btn--primary"><?php esc_html_e( 'Generate Missing Invoices', 'noor-tms' ); ?></button>
+			</form>
+		</div>
+
+		<?php if ( ! empty( $_GET['invoices_generated'] ) ) : ?>
+			<div class="noor-notice noor-notice--success" style="margin-bottom:20px;">
+				<?php esc_html_e( 'Invoices generated for all eligible students across all missing months.', 'noor-tms' ); ?>
+			</div>
+		<?php endif; ?>
+
+		<!-- Search -->
+		<div class="noor-filter-row" style="margin-bottom:16px;">
+			<input type="search" id="noor_inv_search" value="<?php echo esc_attr( $inv_search ); ?>"
+			       placeholder="<?php esc_attr_e( 'Search by student name…', 'noor-tms' ); ?>" />
+			<button type="button" class="noor-btn noor-btn--secondary"
+			        onclick="noorApplyFeeFilter('invoices','noor_inv_search');">
+				<?php esc_html_e( 'Search', 'noor-tms' ); ?>
+			</button>
+		</div>
+
+		<?php if ( empty( $inv_rows ) ) : ?>
+			<div class="noor-notice noor-notice--warning"><?php esc_html_e( 'No invoices found.', 'noor-tms' ); ?></div>
+		<?php else : ?>
+			<div class="noor-table-wrap">
+				<table class="noor-table">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Student', 'noor-tms' ); ?></th>
+							<th><?php esc_html_e( 'Class', 'noor-tms' ); ?></th>
+							<th style="text-align:center;"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Total Billed', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Total Paid', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Balance', 'noor-tms' ); ?></th>
+							<th style="text-align:center;"><?php esc_html_e( 'Overview', 'noor-tms' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $inv_rows as $inv_row ) :
+							$inv_detail_link = add_query_arg( [ 'tms_action' => 'invoices', 'student_id' => $inv_row['student_id'] ], home_url( '/tms-fees/' ) );
+							$inv_row_balance = (float) $inv_row['total_billed'] - (float) $inv_row['total_paid'];
+						?>
+						<tr style="cursor:pointer;" onclick="window.location='<?php echo esc_url( $inv_detail_link ); ?>'">
+							<td>
+								<a href="<?php echo esc_url( $inv_detail_link ); ?>"
+								   style="font-weight:600; color:var(--tms-primary); text-decoration:none;">
+									<?php echo esc_html( $inv_row['student_name'] ); ?>
+								</a>
+							</td>
+							<td style="color:var(--tms-muted);"><?php echo esc_html( $inv_row['class_name'] ?: '—' ); ?></td>
+							<td style="text-align:center;">
+								<span style="font-size:13px; color:var(--tms-muted);">
+									<?php
+									printf(
+										/* translators: 1: paid count 2: total count */
+										esc_html__( '%1$d paid / %2$d total', 'noor-tms' ),
+										(int) $inv_row['paid_count'],
+										(int) $inv_row['invoice_count']
+									);
+									?>
+								</span>
+								<?php if ( (int) $inv_row['unpaid_count'] > 0 ) : ?>
+									<span class="noor-pct-fail" style="margin-left:4px; font-size:11px;">
+										<?php echo esc_html( $inv_row['unpaid_count'] ); ?> unpaid
+									</span>
+								<?php endif; ?>
+							</td>
+							<td style="text-align:right; font-weight:500;"><?php echo esc_html( number_format_i18n( (float) $inv_row['total_billed'], 2 ) ); ?></td>
+							<td style="text-align:right; color:var(--tms-pass);"><?php echo esc_html( number_format_i18n( (float) $inv_row['total_paid'], 2 ) ); ?></td>
+							<td style="text-align:right; font-weight:600; color:<?php echo $inv_row_balance > 0 ? 'var(--tms-fail)' : 'var(--tms-pass)'; ?>;">
+								<?php echo esc_html( number_format_i18n( max( 0.0, $inv_row_balance ), 2 ) ); ?>
+							</td>
+							<td style="text-align:center;">
+								<?php if ( (int) $inv_row['unpaid_count'] === 0 && (int) $inv_row['partial_count'] === 0 ) : ?>
+									<span class="noor-pct-pass"><?php esc_html_e( 'All Paid', 'noor-tms' ); ?></span>
+								<?php elseif ( (int) $inv_row['partial_count'] > 0 ) : ?>
+									<span class="noor-badge" style="background:#fffbeb; color:#92400e;"><?php esc_html_e( 'Partial', 'noor-tms' ); ?></span>
+								<?php else : ?>
+									<span class="noor-pct-fail"><?php esc_html_e( 'Unpaid', 'noor-tms' ); ?></span>
+								<?php endif; ?>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+
+			<!-- Pagination -->
+			<?php if ( $inv_total_pages > 1 ) : ?>
+				<div class="noor-pagination-wrap">
+					<div class="noor-pagination-info">
+						<?php
+						$inv_start = ( $inv_paged - 1 ) * 15 + 1;
+						$inv_end   = min( $inv_paged * 15, $inv_total );
+						printf(
+							esc_html__( 'Showing %1$d–%2$d of %3$d students', 'noor-tms' ),
+							intval( $inv_start ), intval( $inv_end ), intval( $inv_total )
+						);
+						?>
+					</div>
+					<div class="noor-pagination">
+						<?php
+						echo paginate_links( [
+							'base'      => add_query_arg( [ 'tms_page' => '%#%', 'noor_search' => $inv_search ?: false ], home_url( '/tms-fees/?tms_action=invoices' ) ),
+							'format'    => '',
+							'prev_text' => '&laquo; ' . esc_html__( 'Previous', 'noor-tms' ),
+							'next_text' => esc_html__( 'Next', 'noor-tms' ) . ' &raquo;',
+							'total'     => $inv_total_pages,
+							'current'   => $inv_paged,
+							'type'      => 'plain',
+						] );
+						?>
+					</div>
+				</div>
+			<?php endif; ?>
+
+		<?php endif; // empty rows ?>
+		<?php endif; // list vs detail ?>
 
 	<?php elseif ( 'payments' === $action ) : 
 		$student_id = (int) ( $_GET['student_id'] ?? 0 );
@@ -238,17 +402,130 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 			<?php endif; ?>
 		<?php endif; ?>
 
-	<?php elseif ( 'defaulters' === $action ) : ?>
-		<h2 style="margin-top:0;"><?php esc_html_e( 'Defaulters List', 'noor-tms' ); ?></h2>
-		<p style="color: var(--tms-muted); margin-bottom: 20px;"><?php esc_html_e( 'List of students with unpaid or partial invoices.', 'noor-tms' ); ?></p>
-		
-		<?php
-		$defaulters = \Noor_TMS\Includes\DatabaseHandler::get_defaulters();
-		if ( empty( $defaulters ) ) :
-			?>
-			<div class="noor-notice noor-notice--success">
-				<?php esc_html_e( 'Great news! There are no defaulters found.', 'noor-tms' ); ?>
+	<?php elseif ( 'defaulters' === $action ) :
+		$def_student_id = (int) ( $_GET['student_id'] ?? 0 );
+
+		if ( $def_student_id > 0 ) :
+			// ── Detail view: unpaid invoices for one student ─────────────────
+			$def_student      = \Noor_TMS\Includes\DatabaseHandler::get_student( $def_student_id );
+			$def_detail_rows  = \Noor_TMS\Includes\DatabaseHandler::get_unpaid_invoices_by_student( $def_student_id );
+			$def_summary      = \Noor_TMS\Includes\DatabaseHandler::get_student_fee_summary( $def_student_id );
+			$def_back_url     = add_query_arg( 'tms_action', 'defaulters', home_url( '/tms-fees/' ) );
+			$pay_url_base     = add_query_arg( [ 'tms_action' => 'payments', 'student_id' => $def_student_id ], home_url( '/tms-fees/' ) );
+		?>
+
+		<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+			<div>
+				<a href="<?php echo esc_url( $def_back_url ); ?>" class="noor-btn noor-btn--secondary noor-btn--sm" style="margin-bottom:8px;">
+					&larr; <?php esc_html_e( 'Back to Defaulters', 'noor-tms' ); ?>
+				</a>
+				<h2 style="margin:0; font-size:20px;"><?php echo esc_html( $def_student['name'] ?? __( 'Student', 'noor-tms' ) ); ?></h2>
+				<span style="color:var(--tms-muted); font-size:13px;">
+					<?php echo esc_html( $def_student['class_name'] ?? '' ); ?>
+					<?php if ( ! empty( $def_student['parent_phone'] ) ) : ?>
+						&mdash; <?php echo esc_html( $def_student['parent_phone'] ); ?>
+					<?php endif; ?>
+				</span>
 			</div>
+			<a href="<?php echo esc_url( $pay_url_base ); ?>" class="noor-btn noor-btn--success noor-btn--sm">
+				<?php esc_html_e( 'Record Payment', 'noor-tms' ); ?>
+			</a>
+		</div>
+
+		<!-- Outstanding summary -->
+		<div class="noor-class-grid" style="margin-bottom:24px;">
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Total Outstanding', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-fail); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $def_summary['balance'], 2 ) ); ?></h3>
+			</div>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Unpaid Months', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-fail); margin:6px 0 0;"><?php echo esc_html( $def_summary['unpaid_count'] + $def_summary['partial_count'] ); ?></h3>
+			</div>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Total Paid So Far', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-pass); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $def_summary['total_paid'], 2 ) ); ?></h3>
+			</div>
+			<div class="noor-class-card" style="box-shadow:none; background:#fafbfd;">
+				<div style="font-size:12px; color:var(--tms-muted);"><?php esc_html_e( 'Total Billed', 'noor-tms' ); ?></div>
+				<h3 style="font-size:20px; color:var(--tms-text); margin:6px 0 0;"><?php echo esc_html( number_format_i18n( $def_summary['total_due'], 2 ) ); ?></h3>
+			</div>
+		</div>
+
+		<?php if ( empty( $def_detail_rows ) ) : ?>
+			<div class="noor-notice noor-notice--success"><?php esc_html_e( 'All dues cleared — no outstanding invoices.', 'noor-tms' ); ?></div>
+		<?php else : ?>
+			<div class="noor-table-wrap">
+				<table class="noor-table">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Month', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Net Due', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Paid', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Balance', 'noor-tms' ); ?></th>
+							<th style="text-align:center;"><?php esc_html_e( 'Status', 'noor-tms' ); ?></th>
+							<th style="text-align:center;"><?php esc_html_e( 'Action', 'noor-tms' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $def_detail_rows as $def_row ) :
+							$def_net     = (float) $def_row['net_due'];
+							$def_paid    = (float) $def_row['total_paid'];
+							$def_balance = max( 0.0, $def_net - $def_paid );
+						?>
+						<tr>
+							<td style="font-weight:500;"><?php echo esc_html( gmdate( 'F Y', strtotime( $def_row['invoice_month'] . '-01' ) ) ); ?></td>
+							<td style="text-align:right; font-weight:500;"><?php echo esc_html( number_format_i18n( $def_net, 2 ) ); ?></td>
+							<td style="text-align:right; color:var(--tms-pass);"><?php echo esc_html( number_format_i18n( $def_paid, 2 ) ); ?></td>
+							<td style="text-align:right; font-weight:600; color:var(--tms-fail);"><?php echo esc_html( number_format_i18n( $def_balance, 2 ) ); ?></td>
+							<td style="text-align:center;">
+								<?php if ( 'partial' === $def_row['status'] ) : ?>
+									<span class="noor-badge" style="background:#fffbeb; color:#92400e;"><?php esc_html_e( 'Partial', 'noor-tms' ); ?></span>
+								<?php else : ?>
+									<span class="noor-pct-fail"><?php esc_html_e( 'Unpaid', 'noor-tms' ); ?></span>
+								<?php endif; ?>
+							</td>
+							<td style="text-align:center;">
+								<a href="<?php echo esc_url( $pay_url_base ); ?>" class="noor-btn noor-btn--primary noor-btn--sm">
+									<?php esc_html_e( 'Pay', 'noor-tms' ); ?>
+								</a>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		<?php endif; ?>
+
+		<?php else :
+			// ── List view: one row per student ──────────────────────────────
+			$def_search      = sanitize_text_field( $_GET['noor_search'] ?? '' );
+			$def_paged       = max( 1, (int) ( $_GET['tms_page'] ?? 1 ) );
+			$def_result      = \Noor_TMS\Includes\DatabaseHandler::get_defaulters_by_student( [
+				'per_page' => 15,
+				'page'     => $def_paged,
+				'search'   => $def_search,
+			] );
+			$def_rows        = $def_result['rows'];
+			$def_total       = $def_result['total'];
+			$def_total_pages = $def_result['total_pages'];
+		?>
+
+		<h2 style="margin-top:0;"><?php esc_html_e( 'Defaulters List', 'noor-tms' ); ?></h2>
+		<p style="color:var(--tms-muted); margin-bottom:20px;"><?php esc_html_e( 'One row per student — click a student to see their outstanding invoice breakdown.', 'noor-tms' ); ?></p>
+
+		<!-- Search -->
+		<div class="noor-filter-row" style="margin-bottom:16px;">
+			<input type="search" id="noor_def_search" value="<?php echo esc_attr( $def_search ); ?>"
+			       placeholder="<?php esc_attr_e( 'Search by student name…', 'noor-tms' ); ?>" />
+			<button type="button" class="noor-btn noor-btn--secondary"
+			        onclick="noorApplyFeeFilter('defaulters','noor_def_search');">
+				<?php esc_html_e( 'Search', 'noor-tms' ); ?>
+			</button>
+		</div>
+
+		<?php if ( empty( $def_rows ) ) : ?>
+			<div class="noor-notice noor-notice--success"><?php esc_html_e( 'Great news! No defaulters found.', 'noor-tms' ); ?></div>
 		<?php else : ?>
 			<div class="noor-table-wrap">
 				<table class="noor-table">
@@ -257,39 +534,73 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 							<th><?php esc_html_e( 'Student', 'noor-tms' ); ?></th>
 							<th><?php esc_html_e( 'Class', 'noor-tms' ); ?></th>
 							<th><?php esc_html_e( 'Contact', 'noor-tms' ); ?></th>
-							<th><?php esc_html_e( 'Invoice Month', 'noor-tms' ); ?></th>
-							<th style="text-align:right;"><?php esc_html_e( 'Amount Due', 'noor-tms' ); ?></th>
-							<th style="text-align:center;"><?php esc_html_e( 'Status', 'noor-tms' ); ?></th>
+							<th style="text-align:center;"><?php esc_html_e( 'Unpaid Months', 'noor-tms' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Total Outstanding', 'noor-tms' ); ?></th>
+							<th><?php esc_html_e( 'Since', 'noor-tms' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $defaulters as $defaulter ) : ?>
-							<tr>
-								<td>
-									<div style="font-weight: 600; color: var(--tms-text);"><?php echo esc_html( $defaulter['student_name'] ); ?></div>
-								</td>
-								<td style="color: var(--tms-muted);"><?php echo esc_html( $defaulter['class_name'] ); ?></td>
-								<td style="color: var(--tms-muted);"><?php echo esc_html( $defaulter['parent_phone'] ?: '--' ); ?></td>
-								<td style="color: var(--tms-muted);"><?php echo esc_html( gmdate( 'F Y', strtotime( $defaulter['invoice_month'] . '-01' ) ) ); ?></td>
-								<td style="text-align:right; font-weight: 500; color: var(--tms-text);">
-									<?php 
-										$balance = (float) $defaulter['amount_due'] + (float) $defaulter['fine'] - (float) $defaulter['discount'] - (float) $defaulter['total_paid'];
-										echo esc_html( number_format_i18n( $balance, 2 ) );
-									?>
-								</td>
-								<td style="text-align:center;">
-									<?php if ( 'partial' === $defaulter['status'] ) : ?>
-										<span class="noor-badge" style="background:#fffbeb; color:#92400e;">Partial</span>
-									<?php else : ?>
-										<span class="noor-pct-fail">Unpaid</span>
-									<?php endif; ?>
-								</td>
-							</tr>
+						<?php foreach ( $def_rows as $def_row ) :
+							$def_detail_link = add_query_arg( [ 'tms_action' => 'defaulters', 'student_id' => $def_row['student_id'] ], home_url( '/tms-fees/' ) );
+							$def_row_balance = (float) $def_row['total_due'] - (float) $def_row['total_paid'];
+						?>
+						<tr style="cursor:pointer;" onclick="window.location='<?php echo esc_url( $def_detail_link ); ?>'">
+							<td>
+								<a href="<?php echo esc_url( $def_detail_link ); ?>"
+								   style="font-weight:600; color:var(--tms-fail); text-decoration:none;">
+									<?php echo esc_html( $def_row['student_name'] ); ?>
+								</a>
+							</td>
+							<td style="color:var(--tms-muted);"><?php echo esc_html( $def_row['class_name'] ?: '—' ); ?></td>
+							<td style="color:var(--tms-muted);"><?php echo esc_html( $def_row['parent_phone'] ?: '—' ); ?></td>
+							<td style="text-align:center;">
+								<span class="noor-pct-fail" style="font-size:13px;">
+									<?php echo esc_html( $def_row['unpaid_months'] ); ?>
+								</span>
+							</td>
+							<td style="text-align:right; font-weight:600; color:var(--tms-fail);">
+								<?php echo esc_html( number_format_i18n( max( 0.0, $def_row_balance ), 2 ) ); ?>
+							</td>
+							<td style="color:var(--tms-muted); font-size:13px;">
+								<?php echo esc_html( gmdate( 'M Y', strtotime( $def_row['oldest_unpaid_month'] . '-01' ) ) ); ?>
+							</td>
+						</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
 			</div>
-		<?php endif; ?>
+
+			<!-- Pagination -->
+			<?php if ( $def_total_pages > 1 ) : ?>
+				<div class="noor-pagination-wrap">
+					<div class="noor-pagination-info">
+						<?php
+						$def_start = ( $def_paged - 1 ) * 15 + 1;
+						$def_end   = min( $def_paged * 15, $def_total );
+						printf(
+							esc_html__( 'Showing %1$d–%2$d of %3$d students', 'noor-tms' ),
+							intval( $def_start ), intval( $def_end ), intval( $def_total )
+						);
+						?>
+					</div>
+					<div class="noor-pagination">
+						<?php
+						echo paginate_links( [
+							'base'      => add_query_arg( [ 'tms_page' => '%#%', 'noor_search' => $def_search ?: false ], home_url( '/tms-fees/?tms_action=defaulters' ) ),
+							'format'    => '',
+							'prev_text' => '&laquo; ' . esc_html__( 'Previous', 'noor-tms' ),
+							'next_text' => esc_html__( 'Next', 'noor-tms' ) . ' &raquo;',
+							'total'     => $def_total_pages,
+							'current'   => $def_paged,
+							'type'      => 'plain',
+						] );
+						?>
+					</div>
+				</div>
+			<?php endif; ?>
+
+		<?php endif; // empty rows ?>
+		<?php endif; // list vs detail ?>
 
 	<?php elseif ( 'structures' === $action ) : ?>
 			<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
@@ -432,6 +743,31 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 
 	<?php endif; ?>
 </div>
+
+<script>
+function noorApplyFeeFilter( action, inputId ) {
+	var val = document.getElementById( inputId );
+	var url = '<?php echo esc_js( home_url( '/tms-fees/' ) ); ?>?tms_action=' + action;
+	if ( val && val.value.trim() ) {
+		url += '&noor_search=' + encodeURIComponent( val.value.trim() );
+	}
+	window.location.href = url;
+}
+document.addEventListener( 'DOMContentLoaded', function () {
+	[ 'noor_inv_search', 'noor_def_search' ].forEach( function ( id ) {
+		var el = document.getElementById( id );
+		if ( el ) {
+			el.addEventListener( 'keypress', function ( e ) {
+				if ( e.key === 'Enter' ) {
+					e.preventDefault();
+					var action = id === 'noor_inv_search' ? 'invoices' : 'defaulters';
+					noorApplyFeeFilter( action, id );
+				}
+			} );
+		}
+	} );
+} );
+</script>
 
 <?php
 include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout-close.php';

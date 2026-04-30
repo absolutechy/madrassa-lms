@@ -836,6 +836,33 @@ class DatabaseHandler {
 		return false !== $updated;
 	}
 
+	/**
+	 * Count chat threads whose last_message_at is newer than $since,
+	 * optionally excluding the currently-open thread so the admin's own
+	 * conversation does not trigger the "new conversations" badge.
+	 *
+	 * @param string $since            MySQL datetime string (e.g. '2026-04-30 12:00:00').
+	 * @param int    $exclude_thread   Thread ID to exclude (0 = exclude nothing).
+	 * @return int
+	 */
+	public static function count_threads_updated_since( string $since, int $exclude_thread = 0 ): int {
+		global $wpdb;
+
+		if ( '' === $since ) {
+			return 0;
+		}
+
+		$sql    = 'SELECT COUNT(*) FROM ' . self::chat_threads_table() . ' WHERE last_message_at > %s';
+		$params = [ $since ];
+
+		if ( $exclude_thread > 0 ) {
+			$sql     .= ' AND id != %d';
+			$params[] = $exclude_thread;
+		}
+
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, ...$params ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
 	// -----------------------------------------------------------------------
 	// Classes CRUD
 	// -----------------------------------------------------------------------
@@ -1031,37 +1058,38 @@ class DatabaseHandler {
 	}
 
 	/**
-	 * Get all invoices.
-	 * 
+	 * Get invoices with optional filters.
+	 *
+	 * @param array $args  Optional filters: month, status, search, student_id.
 	 * @return array
 	 */
 	public static function get_invoices( $args = [] ): array {
 		global $wpdb;
-		
+
 		$where = ["i.status != 'void'"];
-		
+
 		if ( ! empty( $args['month'] ) ) {
 			$where[] = $wpdb->prepare( "i.invoice_month = %s", $args['month'] );
 		}
-		
 		if ( ! empty( $args['status'] ) ) {
 			$where[] = $wpdb->prepare( "i.status = %s", $args['status'] );
 		}
-		
-		// If searching by student name
 		if ( ! empty( $args['search'] ) ) {
 			$where[] = $wpdb->prepare( "s.name LIKE %s", '%' . $wpdb->esc_like( $args['search'] ) . '%' );
+		}
+		if ( ! empty( $args['student_id'] ) ) {
+			$where[] = $wpdb->prepare( "i.student_id = %d", (int) $args['student_id'] );
 		}
 
 		$where_sql = implode( ' AND ', $where );
 
 		$query = "
-			SELECT 
+			SELECT
 				i.*,
 				s.name AS student_name,
 				c.name AS class_name,
-				(i.amount_due + i.fine - i.discount) AS net_due,
-				COALESCE(SUM(p.paid_amount), 0) AS total_paid
+				( i.amount_due + i.fine - i.discount ) AS net_due,
+				COALESCE( SUM( p.paid_amount ), 0 )    AS total_paid
 			FROM " . self::fee_invoices_table() . " i
 			JOIN " . self::students_table() . " s ON i.student_id = s.id
 			LEFT JOIN " . self::classes_table() . " c ON s.class_id = c.id
@@ -1072,6 +1100,132 @@ class DatabaseHandler {
 		";
 
 		return $wpdb->get_results( $query, ARRAY_A ) ?: [];
+	}
+
+	/**
+	 * Get invoices aggregated by student (one row per student), with pagination.
+	 *
+	 * @param array $args  Optional: per_page, page, search.
+	 * @return array{ rows: array, total: int, total_pages: int }
+	 */
+	public static function get_invoices_by_student( array $args = [] ): array {
+		global $wpdb;
+
+		$per_page = max( 1, (int) ( $args['per_page'] ?? 15 ) );
+		$page     = max( 1, (int) ( $args['page']     ?? 1  ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$inv = self::fee_invoices_table();
+		$stu = self::students_table();
+		$cls = self::classes_table();
+		$pay = self::fee_payments_table();
+
+		$where  = "i.status != 'void'";
+		$params = [];
+
+		if ( ! empty( $args['search'] ) ) {
+			$where   .= ' AND s.name LIKE %s';
+			$params[] = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
+		}
+
+		$count_sql = "SELECT COUNT(DISTINCT i.student_id) FROM {$inv} i JOIN {$stu} s ON i.student_id = s.id WHERE {$where}";
+		$total     = (int) ( $params
+			? $wpdb->get_var( $wpdb->prepare( $count_sql, ...$params ) ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: $wpdb->get_var( $count_sql ) );
+
+		$row_sql = "
+			SELECT
+				s.id                                                              AS student_id,
+				s.name                                                            AS student_name,
+				c.name                                                            AS class_name,
+				COUNT(i.id)                                                       AS invoice_count,
+				COALESCE( SUM( i.amount_due + i.fine - i.discount ), 0 )          AS total_billed,
+				COALESCE( SUM( COALESCE( ip.total_paid, 0 ) ), 0 )               AS total_paid,
+				SUM( CASE WHEN i.status = 'paid'    THEN 1 ELSE 0 END )          AS paid_count,
+				SUM( CASE WHEN i.status = 'unpaid'  THEN 1 ELSE 0 END )          AS unpaid_count,
+				SUM( CASE WHEN i.status = 'partial' THEN 1 ELSE 0 END )          AS partial_count,
+				MAX( i.invoice_month )                                            AS latest_month
+			FROM {$inv} i
+			JOIN {$stu} s ON i.student_id = s.id
+			LEFT JOIN {$cls} c ON s.class_id = c.id
+			LEFT JOIN (
+				SELECT invoice_id, SUM(paid_amount) AS total_paid FROM {$pay} GROUP BY invoice_id
+			) ip ON ip.invoice_id = i.id
+			WHERE {$where}
+			GROUP BY s.id, s.name, c.name
+			ORDER BY s.name ASC
+			LIMIT %d OFFSET %d";
+
+		$row_args = array_merge( $params, [ $per_page, $offset ] );
+		$rows     = $wpdb->get_results( $wpdb->prepare( $row_sql, ...$row_args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return [
+			'rows'        => $rows ?: [],
+			'total'       => $total,
+			'total_pages' => (int) ceil( $total / $per_page ),
+		];
+	}
+
+	/**
+	 * Get defaulters (unpaid / partial invoices) aggregated by student, with pagination.
+	 *
+	 * @param array $args  Optional: per_page, page, search.
+	 * @return array{ rows: array, total: int, total_pages: int }
+	 */
+	public static function get_defaulters_by_student( array $args = [] ): array {
+		global $wpdb;
+
+		$per_page = max( 1, (int) ( $args['per_page'] ?? 15 ) );
+		$page     = max( 1, (int) ( $args['page']     ?? 1  ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$inv = self::fee_invoices_table();
+		$stu = self::students_table();
+		$cls = self::classes_table();
+		$pay = self::fee_payments_table();
+
+		$where  = "i.status IN ('unpaid','partial')";
+		$params = [];
+
+		if ( ! empty( $args['search'] ) ) {
+			$where   .= ' AND s.name LIKE %s';
+			$params[] = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
+		}
+
+		$count_sql = "SELECT COUNT(DISTINCT i.student_id) FROM {$inv} i JOIN {$stu} s ON i.student_id = s.id WHERE {$where}";
+		$total     = (int) ( $params
+			? $wpdb->get_var( $wpdb->prepare( $count_sql, ...$params ) ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: $wpdb->get_var( $count_sql ) );
+
+		$row_sql = "
+			SELECT
+				s.id                                                              AS student_id,
+				s.name                                                            AS student_name,
+				s.parent_phone,
+				c.name                                                            AS class_name,
+				COUNT(i.id)                                                       AS unpaid_months,
+				COALESCE( SUM( i.amount_due + i.fine - i.discount ), 0 )          AS total_due,
+				COALESCE( SUM( COALESCE( ip.total_paid, 0 ) ), 0 )               AS total_paid,
+				MIN( i.invoice_month )                                            AS oldest_unpaid_month
+			FROM {$inv} i
+			JOIN {$stu} s ON i.student_id = s.id
+			LEFT JOIN {$cls} c ON s.class_id = c.id
+			LEFT JOIN (
+				SELECT invoice_id, SUM(paid_amount) AS total_paid FROM {$pay} GROUP BY invoice_id
+			) ip ON ip.invoice_id = i.id
+			WHERE {$where}
+			GROUP BY s.id, s.name, s.parent_phone, c.name
+			ORDER BY c.name ASC, s.name ASC
+			LIMIT %d OFFSET %d";
+
+		$row_args = array_merge( $params, [ $per_page, $offset ] );
+		$rows     = $wpdb->get_results( $wpdb->prepare( $row_sql, ...$row_args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return [
+			'rows'        => $rows ?: [],
+			'total'       => $total,
+			'total_pages' => (int) ceil( $total / $per_page ),
+		];
 	}
 
 	/**

@@ -20,8 +20,10 @@ defined( 'ABSPATH' ) || exit;
 
 $page_title     = __( 'Students', 'noor-tms' );
 $active_nav     = 'students';
-$topbar_actions = '<a href="' . esc_url( add_query_arg( 'tms_action', 'add', home_url( '/tms-students/' ) ) ) . '"'
-	. ' class="noor-btn noor-btn--primary">+ ' . esc_html__( 'Add Student', 'noor-tms' ) . '</a>';
+$topbar_actions = $is_manager
+	? '<a href="' . esc_url( add_query_arg( 'tms_action', 'add', home_url( '/tms-students/' ) ) ) . '"'
+		. ' class="noor-btn noor-btn--primary">+ ' . esc_html__( 'Add Student', 'noor-tms' ) . '</a>'
+	: '';
 
 include __DIR__ . '/layout.php';
 

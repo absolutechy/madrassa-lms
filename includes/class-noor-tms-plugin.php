@@ -90,6 +90,11 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_student_attendance',   $admin, 'ajax_save_student_attendance' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_teacher_attendance',   $admin, 'ajax_save_teacher_attendance' );
 		$this->loader->add_action( 'admin_post_noor_tms_print_student',          $admin, 'handle_print_student' );
+
+		// Admin live-chat AJAX (logged-in only — no nopriv variants).
+		$this->loader->add_action( 'wp_ajax_noor_tms_admin_chat_fetch', $admin, 'ajax_admin_chat_fetch' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_admin_chat_reply', $admin, 'ajax_admin_chat_reply' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_admin_chat_ping',  $admin, 'ajax_admin_chat_ping'  );
 	}
 
 	// -----------------------------------------------------------------------
