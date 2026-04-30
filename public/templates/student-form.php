@@ -17,6 +17,22 @@ $page_title     = $is_edit ? __( 'Edit Student', 'noor-tms' ) : __( 'Add New Stu
 $active_nav     = 'students';
 $topbar_actions = '<a href="' . esc_url( home_url( '/tms-students/' ) ) . '" class="noor-btn noor-btn--secondary">'
 	. '&larr; ' . esc_html__( 'Back to Students', 'noor-tms' ) . '</a>';
+$print_url      = '';
+
+if ( $is_edit && $student_id > 0 ) {
+	$print_url = wp_nonce_url(
+		add_query_arg(
+			[
+				'action'     => 'noor_tms_print_student',
+				'student_id' => $student_id,
+				'month'      => (int) current_time( 'n' ),
+				'year'       => (int) current_time( 'Y' ),
+			],
+			admin_url( 'admin-post.php' )
+		),
+		'noor_tms_print_student_' . $student_id
+	);
+}
 
 include __DIR__ . '/layout.php';
 ?>
@@ -120,6 +136,11 @@ include __DIR__ . '/layout.php';
 			<button type="submit" class="noor-btn noor-btn--primary">
 				<?php echo esc_html( $is_edit ? __( 'Update Student', 'noor-tms' ) : __( 'Add Student', 'noor-tms' ) ); ?>
 			</button>
+			<?php if ( $print_url ) : ?>
+				<a href="<?php echo esc_url( $print_url ); ?>" class="noor-btn noor-btn--secondary" target="_blank" rel="noopener">
+					<?php esc_html_e( 'Print PDF', 'noor-tms' ); ?>
+				</a>
+			<?php endif; ?>
 			<a href="<?php echo esc_url( home_url( '/tms-students/' ) ); ?>" class="noor-btn noor-btn--secondary">
 				<?php esc_html_e( 'Cancel', 'noor-tms' ); ?>
 			</a>

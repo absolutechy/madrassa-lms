@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings page – store WhatsApp gateway credentials.
+ * Settings page – store WhatsApp, homepage, support, and AI-ready options.
  *
  * @package Noor_TMS\Admin
  */
@@ -121,6 +121,100 @@ class Settings {
 								</p>
 							</td>
 						</tr>
+
+						<tr>
+							<th colspan="2" style="padding-top:24px;">
+								<h2 style="margin:0;"><?php esc_html_e( 'Public Homepage Content', 'noor-tms' ); ?></h2>
+							</th>
+						</tr>
+						<tr>
+							<th scope="row"><label for="madrassa_name"><?php esc_html_e( 'Madrassa Name', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="madrassa_name" name="madrassa_name" class="regular-text" value="<?php echo esc_attr( $opts['madrassa_name'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="madrassa_tagline"><?php esc_html_e( 'Tagline', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="madrassa_tagline" name="madrassa_tagline" class="regular-text" value="<?php echo esc_attr( $opts['madrassa_tagline'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="madrassa_about"><?php esc_html_e( 'About Text', 'noor-tms' ); ?></label></th>
+							<td>
+								<textarea id="madrassa_about" name="madrassa_about" rows="4" class="large-text"><?php echo esc_textarea( $opts['madrassa_about'] ?? '' ); ?></textarea>
+								<p class="description"><?php esc_html_e( 'Shown on the public homepage hero section.', 'noor-tms' ); ?></p>
+							</td>
+						</tr>
+
+						<tr>
+							<th scope="row"><label for="cta_apply_label"><?php esc_html_e( 'CTA: Apply Label', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="cta_apply_label" name="cta_apply_label" class="regular-text" value="<?php echo esc_attr( $opts['cta_apply_label'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="cta_apply_url"><?php esc_html_e( 'CTA: Apply URL', 'noor-tms' ); ?></label></th>
+							<td><input type="url" id="cta_apply_url" name="cta_apply_url" class="regular-text" value="<?php echo esc_attr( $opts['cta_apply_url'] ?? '' ); ?>" placeholder="https://" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="cta_classes_label"><?php esc_html_e( 'CTA: Classes Label', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="cta_classes_label" name="cta_classes_label" class="regular-text" value="<?php echo esc_attr( $opts['cta_classes_label'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="cta_classes_url"><?php esc_html_e( 'CTA: Classes URL', 'noor-tms' ); ?></label></th>
+							<td><input type="url" id="cta_classes_url" name="cta_classes_url" class="regular-text" value="<?php echo esc_attr( $opts['cta_classes_url'] ?? '' ); ?>" placeholder="https://" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="cta_login_label"><?php esc_html_e( 'CTA: Login Label', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="cta_login_label" name="cta_login_label" class="regular-text" value="<?php echo esc_attr( $opts['cta_login_label'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="cta_support_label"><?php esc_html_e( 'CTA: Support Label', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="cta_support_label" name="cta_support_label" class="regular-text" value="<?php echo esc_attr( $opts['cta_support_label'] ?? '' ); ?>" /></td>
+						</tr>
+
+						<tr>
+							<th colspan="2" style="padding-top:24px;">
+								<h2 style="margin:0;"><?php esc_html_e( 'Support Routing', 'noor-tms' ); ?></h2>
+							</th>
+						</tr>
+						<tr>
+							<th scope="row"><label for="support_email"><?php esc_html_e( 'Support Email', 'noor-tms' ); ?></label></th>
+							<td>
+								<input type="email" id="support_email" name="support_email" class="regular-text" value="<?php echo esc_attr( $opts['support_email'] ?? '' ); ?>" />
+								<p class="description"><?php esc_html_e( 'Popup submissions are emailed to this address.', 'noor-tms' ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="support_phone"><?php esc_html_e( 'Support Phone', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="support_phone" name="support_phone" class="regular-text" value="<?php echo esc_attr( $opts['support_phone'] ?? '' ); ?>" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="support_whatsapp"><?php esc_html_e( 'Support WhatsApp', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="support_whatsapp" name="support_whatsapp" class="regular-text" value="<?php echo esc_attr( $opts['support_whatsapp'] ?? '' ); ?>" placeholder="+923001234567" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="support_success_message"><?php esc_html_e( 'Popup Success Message', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="support_success_message" name="support_success_message" class="regular-text" value="<?php echo esc_attr( $opts['support_success_message'] ?? '' ); ?>" /></td>
+						</tr>
+
+						<tr>
+							<th colspan="2" style="padding-top:24px;">
+								<h2 style="margin:0;"><?php esc_html_e( 'AI Agent (OpenAI-ready)', 'noor-tms' ); ?></h2>
+							</th>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'Enable AI Agent', 'noor-tms' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="openai_enabled" value="1" <?php checked( ! empty( $opts['openai_enabled'] ) ); ?> />
+									<?php esc_html_e( 'Store OpenAI configuration for future chat agent rollout.', 'noor-tms' ); ?>
+								</label>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="openai_model"><?php esc_html_e( 'OpenAI Model', 'noor-tms' ); ?></label></th>
+							<td><input type="text" id="openai_model" name="openai_model" class="regular-text" value="<?php echo esc_attr( $opts['openai_model'] ?? '' ); ?>" placeholder="gpt-4o-mini" /></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="openai_api_key"><?php esc_html_e( 'OpenAI API Key', 'noor-tms' ); ?></label></th>
+							<td><input type="password" id="openai_api_key" name="openai_api_key" class="regular-text" value="<?php echo esc_attr( $opts['openai_api_key'] ?? '' ); ?>" autocomplete="new-password" /></td>
+						</tr>
 					</table>
 
 					<?php submit_button( __( 'Save Settings', 'noor-tms' ) ); ?>
@@ -163,19 +257,7 @@ class Settings {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
-		$allowed_providers = [ 'click_to_chat', 'mock', 'ultramsg', 'twilio' ];
-		$provider          = sanitize_key( $_POST['gateway_provider'] ?? 'click_to_chat' );
-
-		update_option(
-			self::OPTION_NAME,
-			[
-				'gateway_provider' => in_array( $provider, $allowed_providers, true ) ? $provider : 'click_to_chat',
-				'api_instance_id'  => sanitize_text_field( $_POST['api_instance_id'] ?? '' ),
-				'api_token'        => sanitize_text_field( $_POST['api_token']        ?? '' ),
-				'sender_number'    => sanitize_text_field( $_POST['sender_number']    ?? '' ),
-				'message_template' => wp_kses_post( $_POST['message_template'] ?? self::default_template() ),
-			]
-		);
+		update_option( self::OPTION_NAME, self::sanitize_options_input( $_POST ) );
 
 		add_settings_error( 'noor_tms_messages', 'settings_saved', __( 'Settings saved.', 'noor-tms' ), 'updated' );
 	}
@@ -194,8 +276,61 @@ class Settings {
 				'api_token'        => '',
 				'sender_number'    => '',
 				'message_template' => self::default_template(),
+				'madrassa_name'    => 'Noor-TMS Madrassa',
+				'madrassa_tagline' => 'A trusted place for Quran and Islamic learning',
+				'madrassa_about'   => __( 'Welcome to our madrassa portal. Explore our classes, admissions, and support options.', 'noor-tms' ),
+				'cta_apply_label'  => __( 'Apply Admission', 'noor-tms' ),
+				'cta_apply_url'    => '',
+				'cta_classes_label'=> __( 'View Classes', 'noor-tms' ),
+				'cta_classes_url'  => '',
+				'cta_login_label'  => __( 'Login Portal', 'noor-tms' ),
+				'cta_support_label'=> __( 'Contact Support', 'noor-tms' ),
+				'support_email'    => sanitize_email( (string) get_option( 'admin_email' ) ),
+				'support_phone'    => '',
+				'support_whatsapp' => '',
+				'support_success_message' => __( 'Your support request has been sent. We will contact you shortly.', 'noor-tms' ),
+				'openai_enabled'   => 0,
+				'openai_model'     => 'gpt-4o-mini',
+				'openai_api_key'   => '',
 			]
 		);
+	}
+
+	/**
+	 * Sanitize incoming settings values.
+	 *
+	 * @param array<string, mixed> $input
+	 * @return array<string, mixed>
+	 */
+	public static function sanitize_options_input( array $input ): array {
+		$input = wp_unslash( $input );
+
+		$allowed_providers = [ 'click_to_chat', 'mock', 'ultramsg', 'twilio' ];
+		$provider          = sanitize_key( $input['gateway_provider'] ?? 'click_to_chat' );
+
+		return [
+			'gateway_provider' => in_array( $provider, $allowed_providers, true ) ? $provider : 'click_to_chat',
+			'api_instance_id'  => sanitize_text_field( $input['api_instance_id'] ?? '' ),
+			'api_token'        => sanitize_text_field( $input['api_token'] ?? '' ),
+			'sender_number'    => sanitize_text_field( $input['sender_number'] ?? '' ),
+			'message_template' => wp_kses_post( $input['message_template'] ?? self::default_template() ),
+			'madrassa_name'    => sanitize_text_field( $input['madrassa_name'] ?? '' ),
+			'madrassa_tagline' => sanitize_text_field( $input['madrassa_tagline'] ?? '' ),
+			'madrassa_about'   => sanitize_textarea_field( $input['madrassa_about'] ?? '' ),
+			'cta_apply_label'  => sanitize_text_field( $input['cta_apply_label'] ?? '' ),
+			'cta_apply_url'    => esc_url_raw( $input['cta_apply_url'] ?? '' ),
+			'cta_classes_label'=> sanitize_text_field( $input['cta_classes_label'] ?? '' ),
+			'cta_classes_url'  => esc_url_raw( $input['cta_classes_url'] ?? '' ),
+			'cta_login_label'  => sanitize_text_field( $input['cta_login_label'] ?? '' ),
+			'cta_support_label'=> sanitize_text_field( $input['cta_support_label'] ?? '' ),
+			'support_email'    => sanitize_email( $input['support_email'] ?? '' ),
+			'support_phone'    => sanitize_text_field( $input['support_phone'] ?? '' ),
+			'support_whatsapp' => sanitize_text_field( $input['support_whatsapp'] ?? '' ),
+			'support_success_message' => sanitize_text_field( $input['support_success_message'] ?? '' ),
+			'openai_enabled'   => empty( $input['openai_enabled'] ) ? 0 : 1,
+			'openai_model'     => sanitize_text_field( $input['openai_model'] ?? 'gpt-4o-mini' ),
+			'openai_api_key'   => sanitize_text_field( $input['openai_api_key'] ?? '' ),
+		];
 	}
 
 	/**

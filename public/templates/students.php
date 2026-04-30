@@ -32,6 +32,10 @@ if ( 'added' === $msg ) {
 } elseif ( 'updated' === $msg ) {
 	echo '<div class="noor-notice noor-notice--success">' . esc_html__( 'Student updated successfully.', 'noor-tms' ) . '</div>';
 }
+
+$ajax_nonce           = wp_create_nonce( 'noor_tms_ajax' );
+$default_print_month = (int) current_time( 'n' );
+$default_print_year  = (int) current_time( 'Y' );
 ?>
 
 <!-- Filter bar -->
@@ -75,24 +79,18 @@ if ( 'added' === $msg ) {
 
 <script>
 function applyNoorStudentFilter() {
-	const url = new URL(window.location.href);
-	
-	// Clean existing parameters
-	url.searchParams.delete('noor_search');
-	url.searchParams.delete('s');
-	url.searchParams.delete('class_id');
-	url.searchParams.delete('status_filter');
-	url.searchParams.delete('paged');
+	const params = [];
 	
 	const search = document.getElementById('noor_search_input').value.trim();
 	const classId = document.getElementById('noor_class_id').value;
 	const status = document.getElementById('noor_status_filter').value;
 	
-	if (search) url.searchParams.set('noor_search', search);
-	if (classId) url.searchParams.set('class_id', classId);
-	if (status) url.searchParams.set('status_filter', status);
+	if (search) params.push('noor_search=' + encodeURIComponent(search));
+	if (classId) params.push('class_id=' + encodeURIComponent(classId));
+	if (status) params.push('status_filter=' + encodeURIComponent(status));
 	
-	window.location.href = url.toString();
+	const query = params.length ? ('?' + params.join('&')) : '';
+	window.location.href = window.location.pathname + query;
 }
 
 document.getElementById('noor_search_input').addEventListener('keypress', function(e) {
@@ -127,6 +125,38 @@ document.getElementById('noor_search_input').addEventListener('keypress', functi
 			</thead>
 			<tbody>
 				<?php foreach ( $students as $student ) : ?>
+					<?php
+					$edit_url = add_query_arg(
+						[
+							'tms_action'  => 'edit',
+							'student_id' => $student['id'],
+						],
+						home_url( '/tms-students/' )
+					);
+
+					$results_url = ! empty( $student['class_id'] )
+						? add_query_arg(
+							[
+								'class_id'   => $student['class_id'],
+								'student_id' => $student['id'],
+							],
+							home_url( '/tms-results/' )
+						)
+						: '';
+
+					$print_url = wp_nonce_url(
+						add_query_arg(
+							[
+								'action'     => 'noor_tms_print_student',
+								'student_id' => $student['id'],
+								'month'      => $default_print_month,
+								'year'       => $default_print_year,
+							],
+							admin_url( 'admin-post.php' )
+						),
+						'noor_tms_print_student_' . (int) $student['id']
+					);
+					?>
 					<tr>
 						<td>
 							<?php if ( ! empty( $student['photo_id'] ) ) : ?>
@@ -137,7 +167,7 @@ document.getElementById('noor_search_input').addEventListener('keypress', functi
 						</td>
 						<td>
 							<strong>
-							<a href="<?php echo esc_url( add_query_arg( [ 'tms_action' => 'edit', 'student_id' => $student['id'] ], home_url( '/tms-students/' ) ) ); ?>"
+							<a href="<?php echo esc_url( $edit_url ); ?>"
 								   style="color:var(--tms-primary);text-decoration:none;">
 									<?php echo esc_html( $student['name'] ); ?>
 								</a>
@@ -169,23 +199,35 @@ document.getElementById('noor_search_input').addEventListener('keypress', functi
 							</span>
 						</td>
 						<td class="noor-actions">
-						<a href="<?php echo esc_url( add_query_arg( [ 'tms_action' => 'edit', 'student_id' => $student['id'] ], home_url( '/tms-students/' ) ) ); ?>"
-							   class="noor-btn noor-btn--secondary noor-btn--sm">
-								<?php esc_html_e( 'Edit', 'noor-tms' ); ?>
-							</a>
-
-							<?php if ( ! empty( $student['class_id'] ) ) : ?>
-								<a href="<?php echo esc_url( add_query_arg( [ 'class_id' => $student['class_id'], 'student_id' => $student['id'] ], home_url( '/tms-results/' ) ) ); ?>"
-								   class="noor-btn noor-btn--secondary noor-btn--sm">
-									<?php esc_html_e( 'Results', 'noor-tms' ); ?>
-								</a>
-							<?php endif; ?>
-
-							<button type="button"
-									class="noor-btn noor-btn--danger noor-btn--sm noor-delete-student"
-								data-id="<?php echo esc_attr( $student['id'] ); ?>">
-								<?php esc_html_e( 'Delete', 'noor-tms' ); ?>
-							</button>
+							<div class="noor-actions-menu">
+								<button type="button" class="noor-actions-toggle" aria-haspopup="true" aria-expanded="false" aria-label="<?php esc_attr_e( 'Quick actions', 'noor-tms' ); ?>">
+									<span aria-hidden="true">&#8942;</span>
+								</button>
+								<div class="noor-actions-dropdown" role="menu" hidden>
+									<a href="<?php echo esc_url( $edit_url ); ?>" class="noor-actions-link" role="menuitem">
+										<?php esc_html_e( 'Edit', 'noor-tms' ); ?>
+									</a>
+									<?php if ( $results_url ) : ?>
+										<a href="<?php echo esc_url( $results_url ); ?>" class="noor-actions-link" role="menuitem">
+											<?php esc_html_e( 'Results', 'noor-tms' ); ?>
+										</a>
+									<?php else : ?>
+										<span class="noor-actions-link is-disabled" role="menuitem" aria-disabled="true">
+											<?php esc_html_e( 'Results', 'noor-tms' ); ?>
+										</span>
+									<?php endif; ?>
+									<a href="<?php echo esc_url( $print_url ); ?>" class="noor-actions-link" role="menuitem" target="_blank" rel="noopener">
+										<?php esc_html_e( 'Print PDF', 'noor-tms' ); ?>
+									</a>
+									<a href="#" class="noor-actions-link is-danger noor-delete-student"
+										   data-id="<?php echo esc_attr( $student['id'] ); ?>"
+										   data-nonce="<?php echo esc_attr( $ajax_nonce ); ?>"
+										   role="menuitem"
+										   >
+										<?php esc_html_e( 'Delete', 'noor-tms' ); ?>
+									</a>
+								</div>
+							</div>
 						</td>
 					</tr>
 				<?php endforeach; ?>
@@ -195,18 +237,45 @@ document.getElementById('noor_search_input').addEventListener('keypress', functi
 
 	<!-- Pagination -->
 	<?php if ( $total_pages > 1 ) : ?>
-		<div class="noor-pagination">
-			<?php
-			echo paginate_links( [
-				'base'      => add_query_arg( 'paged', '%#%' ),
-				'format'    => '',
-				'prev_text' => '&laquo;',
-				'next_text' => '&raquo;',
-				'total'     => $total_pages,
-				'current'   => $paged,
-				'type'      => 'list',
-			] );
-			?>
+		<div class="noor-pagination-wrap">
+			<div class="noor-pagination-info">
+				<?php 
+					$per_page = 10;
+					$start = ( $paged - 1 ) * $per_page + 1;
+					$end = min( $paged * $per_page, $total );
+					printf( 
+						esc_html__( 'Showing %d–%d of %d students', 'noor-tms' ),
+						intval( $start ),
+						intval( $end ),
+						intval( $total )
+					);
+				?>
+			</div>
+			<div class="noor-pagination">
+				<?php
+				// Build base URL with current filters preserved
+				// We use 'tms_page' instead of 'paged' to avoid WP canonical redirects
+				$pagination_base = add_query_arg( 
+					[
+						'tms_page'       => '%#%',
+						'noor_search'    => $search ? $search : false,
+						'class_id'       => $class_id ? $class_id : false,
+						'status_filter'  => $status ? $status : false,
+					],
+					home_url( '/tms-students/' )
+				);
+				
+				echo paginate_links( [
+					'base'      => $pagination_base,
+					'format'    => '',
+					'prev_text' => '&laquo; ' . esc_html__( 'Previous', 'noor-tms' ),
+					'next_text' => esc_html__( 'Next', 'noor-tms' ) . ' &raquo;',
+					'total'     => $total_pages,
+					'current'   => $paged,
+					'type'      => 'plain',
+				] );
+				?>
+			</div>
 		</div>
 	<?php endif; ?>
 

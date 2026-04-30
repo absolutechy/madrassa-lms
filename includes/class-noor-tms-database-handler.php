@@ -2,7 +2,7 @@
 /**
  * Database abstraction layer for Noor-TMS.
  *
- * Manages eight custom tables:
+ * Manages plugin custom tables:
  *   - {prefix}mms_classes
  *   - {prefix}mms_subjects
  *   - {prefix}mms_students
@@ -11,6 +11,13 @@
  *   - {prefix}mms_class_teachers
  *   - {prefix}mms_student_attendance
  *   - {prefix}mms_teacher_attendance
+ *   - {prefix}mms_fee_structure
+ *   - {prefix}mms_student_fee_assignment
+ *   - {prefix}mms_fee_invoices
+ *   - {prefix}mms_fee_payments
+ *   - {prefix}mms_support_requests
+ *   - {prefix}mms_chat_threads
+ *   - {prefix}mms_chat_messages
  *
  * All public methods are static so callers need not hold an instance.
  *
@@ -27,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '4.0';
+	private const SCHEMA_VERSION = '6.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -226,6 +233,53 @@ class DatabaseHandler {
 			KEY idx_invoice_id (invoice_id)
 		) {$charset_collate};";
 
+		$sql_support_requests = "CREATE TABLE " . self::support_requests_table() . " (
+			id              BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id         BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			requester_name  VARCHAR(255)        NOT NULL DEFAULT '',
+			requester_email VARCHAR(255)        NOT NULL DEFAULT '',
+			requester_phone VARCHAR(50)         NOT NULL DEFAULT '',
+			subject         VARCHAR(255)        NOT NULL DEFAULT '',
+			message         LONGTEXT            NOT NULL,
+			status          VARCHAR(20)         NOT NULL DEFAULT 'open',
+			source_url      VARCHAR(255)        NOT NULL DEFAULT '',
+			created_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_status_created (status, created_at),
+			KEY idx_email (requester_email)
+		) {$charset_collate};";
+
+		$sql_chat_threads = "CREATE TABLE " . self::chat_threads_table() . " (
+			id              BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id         BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			visitor_token   VARCHAR(64)         NOT NULL DEFAULT '',
+			requester_name  VARCHAR(255)        NOT NULL DEFAULT '',
+			requester_email VARCHAR(255)        NOT NULL DEFAULT '',
+			requester_phone VARCHAR(50)         NOT NULL DEFAULT '',
+			status          VARCHAR(20)         NOT NULL DEFAULT 'open',
+			source_url      VARCHAR(255)        NOT NULL DEFAULT '',
+			created_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			last_message_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_status_last (status, last_message_at),
+			KEY idx_user_id (user_id),
+			KEY idx_visitor_token (visitor_token)
+		) {$charset_collate};";
+
+		$sql_chat_messages = "CREATE TABLE " . self::chat_messages_table() . " (
+			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			thread_id      BIGINT(20) UNSIGNED NOT NULL,
+			sender_role    VARCHAR(20)         NOT NULL DEFAULT 'visitor',
+			sender_user_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			message_text   LONGTEXT            NOT NULL,
+			created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_thread_id (thread_id),
+			KEY idx_thread_created (thread_id, created_at)
+		) {$charset_collate};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql_classes );
 		dbDelta( $sql_subjects );
@@ -239,6 +293,9 @@ class DatabaseHandler {
 		dbDelta( $sql_fee_assignment );
 		dbDelta( $sql_fee_invoices );
 		dbDelta( $sql_fee_payments );
+		dbDelta( $sql_support_requests );
+		dbDelta( $sql_chat_threads );
+		dbDelta( $sql_chat_messages );
 
 		$installed = get_option( self::SCHEMA_OPTION, '1.0' );
 
@@ -272,6 +329,9 @@ class DatabaseHandler {
 	public static function drop_tables(): void {
 		global $wpdb;
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::chat_messages_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::chat_threads_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::support_requests_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::teacher_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::student_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::class_teachers_table() );
@@ -350,6 +410,430 @@ class DatabaseHandler {
 	public static function fee_payments_table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'mms_fee_payments';
+	}
+
+	public static function support_requests_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_support_requests';
+	}
+
+	public static function chat_threads_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_chat_threads';
+	}
+
+	public static function chat_messages_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_chat_messages';
+	}
+
+	// -----------------------------------------------------------------------
+	// Support requests
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Insert a new support request.
+	 *
+	 * @param array<string, mixed> $data
+	 * @return int|false
+	 */
+	public static function insert_support_request( array $data ): int|false {
+		global $wpdb;
+
+		$allowed_statuses = [ 'open', 'in_progress', 'resolved', 'closed' ];
+		$status = sanitize_key( $data['status'] ?? 'open' );
+		if ( ! in_array( $status, $allowed_statuses, true ) ) {
+			$status = 'open';
+		}
+
+		$inserted = $wpdb->insert(
+			self::support_requests_table(),
+			[
+				'user_id'         => (int) ( $data['user_id'] ?? 0 ),
+				'requester_name'  => sanitize_text_field( $data['requester_name'] ?? '' ),
+				'requester_email' => sanitize_email( $data['requester_email'] ?? '' ),
+				'requester_phone' => sanitize_text_field( $data['requester_phone'] ?? '' ),
+				'subject'         => sanitize_text_field( $data['subject'] ?? '' ),
+				'message'         => sanitize_textarea_field( $data['message'] ?? '' ),
+				'status'          => $status,
+				'source_url'      => esc_url_raw( $data['source_url'] ?? '' ),
+				'created_at'      => current_time( 'mysql' ),
+			],
+			[ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
+		);
+
+		return $inserted ? (int) $wpdb->insert_id : false;
+	}
+
+	/**
+	 * Get paginated support requests.
+	 *
+	 * @param array<string, mixed> $args
+	 * @return array{rows: array<int, array<string, mixed>>, total: int}
+	 */
+	public static function get_support_requests( array $args = [] ): array {
+		global $wpdb;
+
+		$per_page = max( 1, (int) ( $args['per_page'] ?? 20 ) );
+		$page     = max( 1, (int) ( $args['page'] ?? 1 ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$where  = '1=1';
+		$params = [];
+
+		$status = sanitize_key( $args['status'] ?? '' );
+		if ( in_array( $status, [ 'open', 'in_progress', 'resolved', 'closed' ], true ) ) {
+			$where   .= ' AND status = %s';
+			$params[] = $status;
+		}
+
+		if ( ! empty( $args['search'] ) ) {
+			$search   = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
+			$where   .= ' AND (requester_name LIKE %s OR requester_email LIKE %s OR subject LIKE %s OR message LIKE %s)';
+			$params[] = $search;
+			$params[] = $search;
+			$params[] = $search;
+			$params[] = $search;
+		}
+
+		$count_sql = 'SELECT COUNT(*) FROM ' . self::support_requests_table() . ' WHERE ' . $where;
+		$total     = (int) ( $params
+			? $wpdb->get_var( $wpdb->prepare( $count_sql, ...$params ) ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: $wpdb->get_var( $count_sql )
+		);
+
+		$row_sql  = 'SELECT * FROM ' . self::support_requests_table() . ' WHERE ' . $where . ' ORDER BY created_at DESC LIMIT %d OFFSET %d';
+		$row_args = array_merge( $params, [ $per_page, $offset ] );
+		$rows     = $wpdb->get_results( $wpdb->prepare( $row_sql, ...$row_args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return [
+			'rows'  => $rows ?: [],
+			'total' => $total,
+		];
+	}
+
+	/**
+	 * Get one support request by ID.
+	 *
+	 * @param int $id
+	 * @return array<string, mixed>|null
+	 */
+	public static function get_support_request( int $id ): ?array {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::support_requests_table() . ' WHERE id = %d',
+				$id
+			),
+			ARRAY_A
+		);
+
+		return $row ?: null;
+	}
+
+	/**
+	 * Update support request status.
+	 *
+	 * @param int    $id
+	 * @param string $status
+	 * @return bool
+	 */
+	public static function update_support_request_status( int $id, string $status ): bool {
+		global $wpdb;
+
+		$allowed_statuses = [ 'open', 'in_progress', 'resolved', 'closed' ];
+		$status = sanitize_key( $status );
+		if ( ! in_array( $status, $allowed_statuses, true ) ) {
+			return false;
+		}
+
+		$updated = $wpdb->update(
+			self::support_requests_table(),
+			[ 'status' => $status ],
+			[ 'id' => $id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
+
+		return false !== $updated;
+	}
+
+	// -----------------------------------------------------------------------
+	// Chat
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Create or resolve a chat thread for a visitor/user.
+	 *
+	 * @param array<string, mixed> $data
+	 * @return int|false
+	 */
+	public static function get_or_create_chat_thread( array $data ): int|false {
+		global $wpdb;
+
+		$user_id       = (int) ( $data['user_id'] ?? 0 );
+		$visitor_token = sanitize_text_field( (string) ( $data['visitor_token'] ?? '' ) );
+		$name          = sanitize_text_field( (string) ( $data['requester_name'] ?? '' ) );
+		$email         = sanitize_email( (string) ( $data['requester_email'] ?? '' ) );
+		$phone         = sanitize_text_field( (string) ( $data['requester_phone'] ?? '' ) );
+		$source_url    = esc_url_raw( (string) ( $data['source_url'] ?? '' ) );
+
+		$thread_id = 0;
+		if ( $user_id > 0 ) {
+			$thread_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT id FROM ' . self::chat_threads_table() . ' WHERE user_id = %d ORDER BY id DESC LIMIT 1',
+					$user_id
+				)
+			);
+		} elseif ( '' !== $visitor_token ) {
+			$thread_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT id FROM ' . self::chat_threads_table() . ' WHERE visitor_token = %s ORDER BY id DESC LIMIT 1',
+					$visitor_token
+				)
+			);
+		}
+
+		if ( $thread_id > 0 ) {
+			$update_data = [
+				'updated_at' => current_time( 'mysql' ),
+			];
+
+			if ( '' !== $name ) {
+				$update_data['requester_name'] = $name;
+			}
+			if ( '' !== $email ) {
+				$update_data['requester_email'] = $email;
+			}
+			if ( '' !== $phone ) {
+				$update_data['requester_phone'] = $phone;
+			}
+			if ( '' !== $source_url ) {
+				$update_data['source_url'] = $source_url;
+			}
+
+			$wpdb->update(
+				self::chat_threads_table(),
+				$update_data,
+				[ 'id' => $thread_id ]
+			);
+
+			return $thread_id;
+		}
+
+		$inserted = $wpdb->insert(
+			self::chat_threads_table(),
+			[
+				'user_id'         => $user_id,
+				'visitor_token'   => $visitor_token,
+				'requester_name'  => $name,
+				'requester_email' => $email,
+				'requester_phone' => $phone,
+				'source_url'      => $source_url,
+				'status'          => 'open',
+				'created_at'      => current_time( 'mysql' ),
+				'last_message_at' => current_time( 'mysql' ),
+			],
+			[ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
+		);
+
+		return $inserted ? (int) $wpdb->insert_id : false;
+	}
+
+	/**
+	 * Get one chat thread.
+	 *
+	 * @param int $thread_id
+	 * @return array<string, mixed>|null
+	 */
+	public static function get_chat_thread( int $thread_id ): ?array {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::chat_threads_table() . ' WHERE id = %d',
+				$thread_id
+			),
+			ARRAY_A
+		);
+
+		return $row ?: null;
+	}
+
+	/**
+	 * Get chat messages for a thread.
+	 *
+	 * @param int $thread_id
+	 * @param int $after_id
+	 * @param int $limit
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_chat_messages( int $thread_id, int $after_id = 0, int $limit = 60 ): array {
+		global $wpdb;
+
+		$limit = max( 1, min( 200, $limit ) );
+
+		if ( $after_id > 0 ) {
+			$query = $wpdb->prepare(
+				'SELECT * FROM ' . self::chat_messages_table() . ' WHERE thread_id = %d AND id > %d ORDER BY id ASC LIMIT %d',
+				$thread_id,
+				$after_id,
+				$limit
+			);
+		} else {
+			$query = $wpdb->prepare(
+				'SELECT * FROM ' . self::chat_messages_table() . ' WHERE thread_id = %d ORDER BY id ASC LIMIT %d',
+				$thread_id,
+				$limit
+			);
+		}
+
+		$rows = $wpdb->get_results( $query, ARRAY_A );
+		return $rows ?: [];
+	}
+
+	/**
+	 * Insert one chat message.
+	 *
+	 * @param int    $thread_id
+	 * @param string $sender_role
+	 * @param string $message
+	 * @param int    $sender_user_id
+	 * @return int|false
+	 */
+	public static function insert_chat_message( int $thread_id, string $sender_role, string $message, int $sender_user_id = 0 ): int|false {
+		global $wpdb;
+
+		$allowed_roles = [ 'visitor', 'agent', 'system' ];
+		$sender_role   = sanitize_key( $sender_role );
+		if ( ! in_array( $sender_role, $allowed_roles, true ) ) {
+			$sender_role = 'visitor';
+		}
+
+		$message = sanitize_textarea_field( $message );
+		if ( '' === $message ) {
+			return false;
+		}
+
+		$inserted = $wpdb->insert(
+			self::chat_messages_table(),
+			[
+				'thread_id'      => $thread_id,
+				'sender_role'    => $sender_role,
+				'sender_user_id' => max( 0, $sender_user_id ),
+				'message_text'   => $message,
+				'created_at'     => current_time( 'mysql' ),
+			],
+			[ '%d', '%s', '%d', '%s', '%s' ]
+		);
+
+		if ( ! $inserted ) {
+			return false;
+		}
+
+		$wpdb->update(
+			self::chat_threads_table(),
+			[
+				'updated_at'      => current_time( 'mysql' ),
+				'last_message_at' => current_time( 'mysql' ),
+			],
+			[ 'id' => $thread_id ],
+			[ '%s', '%s' ],
+			[ '%d' ]
+		);
+
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Get paginated chat threads for admin inbox.
+	 *
+	 * @param array<string, mixed> $args
+	 * @return array{rows: array<int, array<string, mixed>>, total: int}
+	 */
+	public static function get_chat_threads( array $args = [] ): array {
+		global $wpdb;
+
+		$per_page = max( 1, (int) ( $args['per_page'] ?? 20 ) );
+		$page     = max( 1, (int) ( $args['page'] ?? 1 ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$where  = '1=1';
+		$params = [];
+
+		$status = sanitize_key( (string) ( $args['status'] ?? '' ) );
+		if ( in_array( $status, [ 'open', 'in_progress', 'resolved', 'closed' ], true ) ) {
+			$where   .= ' AND t.status = %s';
+			$params[] = $status;
+		}
+
+		if ( ! empty( $args['search'] ) ) {
+			$search   = '%' . $wpdb->esc_like( sanitize_text_field( (string) $args['search'] ) ) . '%';
+			$where   .= ' AND (t.requester_name LIKE %s OR t.requester_email LIKE %s OR t.requester_phone LIKE %s)';
+			$params[] = $search;
+			$params[] = $search;
+			$params[] = $search;
+		}
+
+		$count_sql = 'SELECT COUNT(*) FROM ' . self::chat_threads_table() . ' t WHERE ' . $where;
+		$total     = (int) ( $params
+			? $wpdb->get_var( $wpdb->prepare( $count_sql, ...$params ) ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: $wpdb->get_var( $count_sql )
+		);
+
+		$row_sql = 'SELECT t.*, m.message_text AS last_message, m.sender_role AS last_sender_role
+			FROM ' . self::chat_threads_table() . ' t
+			LEFT JOIN ' . self::chat_messages_table() . ' m
+				ON m.id = (
+					SELECT mm.id
+					FROM ' . self::chat_messages_table() . ' mm
+					WHERE mm.thread_id = t.id
+					ORDER BY mm.id DESC
+					LIMIT 1
+				)
+			WHERE ' . $where . '
+			ORDER BY t.last_message_at DESC, t.id DESC
+			LIMIT %d OFFSET %d';
+
+		$row_args = array_merge( $params, [ $per_page, $offset ] );
+		$rows     = $wpdb->get_results( $wpdb->prepare( $row_sql, ...$row_args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return [
+			'rows'  => $rows ?: [],
+			'total' => $total,
+		];
+	}
+
+	/**
+	 * Update chat thread status.
+	 *
+	 * @param int    $thread_id
+	 * @param string $status
+	 * @return bool
+	 */
+	public static function update_chat_thread_status( int $thread_id, string $status ): bool {
+		global $wpdb;
+
+		$allowed_statuses = [ 'open', 'in_progress', 'resolved', 'closed' ];
+		$status = sanitize_key( $status );
+		if ( ! in_array( $status, $allowed_statuses, true ) ) {
+			return false;
+		}
+
+		$updated = $wpdb->update(
+			self::chat_threads_table(),
+			[
+				'status'     => $status,
+				'updated_at' => current_time( 'mysql' ),
+			],
+			[ 'id' => $thread_id ],
+			[ '%s', '%s' ],
+			[ '%d' ]
+		);
+
+		return false !== $updated;
 	}
 
 	// -----------------------------------------------------------------------
@@ -608,6 +1092,62 @@ class DatabaseHandler {
 		", $student_id );
 
 		return $wpdb->get_results( $query, ARRAY_A ) ?: [];
+	}
+
+	/**
+	 * Get fee summary totals for a single student.
+	 *
+	 * @param int $student_id
+	 * @return array<string, int|float>
+	 */
+	public static function get_student_fee_summary( int $student_id ): array {
+		global $wpdb;
+
+		$payments_subquery = 'SELECT invoice_id, SUM(paid_amount) AS total_paid
+			FROM ' . self::fee_payments_table() . '
+			GROUP BY invoice_id';
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COALESCE(SUM(i.amount_due + i.fine - i.discount), 0) AS total_due,
+					COALESCE(SUM(COALESCE(p.total_paid, 0)), 0) AS total_paid,
+					COUNT(i.id) AS invoice_count,
+					SUM(CASE WHEN i.status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
+					SUM(CASE WHEN i.status = 'partial' THEN 1 ELSE 0 END) AS partial_count,
+					SUM(CASE WHEN i.status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count
+				 FROM " . self::fee_invoices_table() . " i
+				 LEFT JOIN ({$payments_subquery}) p ON p.invoice_id = i.id
+				 WHERE i.student_id = %d AND i.status != 'void'",
+				$student_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return [
+				'total_due'    => 0.0,
+				'total_paid'   => 0.0,
+				'balance'      => 0.0,
+				'invoice_count' => 0,
+				'paid_count'   => 0,
+				'partial_count' => 0,
+				'unpaid_count' => 0,
+			];
+		}
+
+		$total_due  = (float) ( $row['total_due'] ?? 0 );
+		$total_paid = (float) ( $row['total_paid'] ?? 0 );
+
+		return [
+			'total_due'     => $total_due,
+			'total_paid'    => $total_paid,
+			'balance'       => max( 0.0, $total_due - $total_paid ),
+			'invoice_count' => (int) ( $row['invoice_count'] ?? 0 ),
+			'paid_count'    => (int) ( $row['paid_count'] ?? 0 ),
+			'partial_count' => (int) ( $row['partial_count'] ?? 0 ),
+			'unpaid_count'  => (int) ( $row['unpaid_count'] ?? 0 ),
+		];
 	}
 
 	/**

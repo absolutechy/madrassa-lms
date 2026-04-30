@@ -6,12 +6,15 @@
  * provides an auth guard so only logged-in TMS managers see the pages.
  *
  * Shortcode → WordPress Page mapping (create these pages manually):
+ *   [noor_tms_homepage]   → slug: tms-home       (public)
  *   [noor_tms_login]      → slug: tms-login      (all users)
  *   [noor_tms_students]   → slug: tms-students   (managers only)
  *   [noor_tms_classes]    → slug: tms-classes    (managers only)
  *   [noor_tms_results]    → slug: tms-results    (managers only)
+ *   [noor_tms_teachers]   → slug: tms-teachers   (managers only)
  *   [noor_tms_settings]   → slug: tms-settings   (managers only)
  *   [noor_tms_attendance] → slug: tms-attendance (managers + teachers)
+ *   [noor_tms_fees]       → slug: tms-fees       (managers only)
  *
  * @package Noor_TMS\PublicFacing
  */
@@ -20,7 +23,6 @@ namespace Noor_TMS\PublicFacing;
 
 use Noor_TMS\Includes\DatabaseHandler;
 use Noor_TMS\Admin\Settings;
-use Noor_TMS\Admin\WhatsApp;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,6 +39,7 @@ class PublicController {
 	 * Register all shortcodes.
 	 */
 	public function register_shortcodes(): void {
+		add_shortcode( 'noor_tms_homepage',   [ $this, 'sc_homepage' ] );
 		add_shortcode( 'noor_tms_login',      [ $this, 'sc_login' ] );
 		add_shortcode( 'noor_tms_students',   [ $this, 'sc_students' ] );
 		add_shortcode( 'noor_tms_classes',    [ $this, 'sc_classes' ] );
@@ -61,6 +64,7 @@ class PublicController {
 		}
 
 		$tms_shortcodes = [
+			'noor_tms_homepage',
 			'noor_tms_login', 'noor_tms_students',
 			'noor_tms_classes', 'noor_tms_results',
 			'noor_tms_teachers',
@@ -80,43 +84,54 @@ class PublicController {
 			return;
 		}
 
+		$public_css_path = NOOR_TMS_PLUGIN_DIR . 'public/css/noor-tms-public.css';
+		$public_js_path  = NOOR_TMS_PLUGIN_DIR . 'public/js/noor-tms-public.js';
+		$public_css_ver  = file_exists( $public_css_path ) ? (string) filemtime( $public_css_path ) : \NOOR_TMS_VERSION;
+		$public_js_ver   = file_exists( $public_js_path ) ? (string) filemtime( $public_js_path ) : \NOOR_TMS_VERSION;
+
 		wp_enqueue_style(
 			'noor-tms-public',
 			NOOR_TMS_PLUGIN_URL . 'public/css/noor-tms-public.css',
 			[],
-			NOOR_TMS_VERSION
+			$public_css_ver
 		);
 
 		wp_enqueue_script(
 			'noor-tms-public',
 			NOOR_TMS_PLUGIN_URL . 'public/js/noor-tms-public.js',
 			[ 'jquery' ],
-			NOOR_TMS_VERSION,
+			$public_js_ver,
 			true
 		);
+
+		$options = Settings::get_options();
 
 		wp_localize_script( 'noor-tms-public', 'noorTMS', [
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'noor_tms_ajax' ),
 			'i18n'    => [
 				'saving'             => __( 'Saving…',                                    'noor-tms' ),
+				'sending'            => __( 'Sending…',                                   'noor-tms' ),
 				'deleting'           => __( 'Deleting…',                                  'noor-tms' ),
 				'error'              => __( 'An error occurred. Please try again.',        'noor-tms' ),
 				'confirmDelete'      => __( 'Are you sure you want to delete this?',       'noor-tms' ),
 				'saveReport'         => __( 'Save All Results',                            'noor-tms' ),
 				'subjectPlaceholder' => __( 'Subject name',                                'noor-tms' ),
+				'supportSent'        => sanitize_text_field( $options['support_success_message'] ?? __( 'Your request was sent successfully.', 'noor-tms' ) ),
+				'chatStart'          => __( 'Start Chat', 'noor-tms' ),
+				'chatSending'        => __( 'Sending...', 'noor-tms' ),
+				'chatConnected'      => __( 'Connected', 'noor-tms' ),
+				'chatNeedIdentity'   => __( 'Please enter your name and either email or phone to start chat.', 'noor-tms' ),
+				'chatNeedMessage'    => __( 'Please type a message.', 'noor-tms' ),
+				'chatTryAgain'       => __( 'Unable to connect chat right now. Please try again.', 'noor-tms' ),
+			],
+			'chat'    => [
+				'pollMs'         => 7000,
+				'storageKey'     => 'noor_tms_chat_state_v1',
+				'welcomeMessage' => __( 'Assalamu Alaikum! A support agent will join shortly. Please share your question.', 'noor-tms' ),
 			],
 		] );
 	}
-
-	/**
-	 * After a successful login, redirect TMS managers to the front-end portal
-	 * instead of wp-admin.
-	 *
-	 * @param string           $redirect_to  Where WP wants to redirect.
-	 * @param string           $requested    Originally requested URL.
-	 * @param \WP_User|\WP_Error $user       The logged-in user (or error).
-	 */
 	// -----------------------------------------------------------------------
 	// Early request handler (template_redirect)
 	// -----------------------------------------------------------------------
@@ -207,6 +222,18 @@ class PublicController {
 	// -----------------------------------------------------------------------
 
 	/**
+	 * [noor_tms_homepage] – Public homepage.
+	 */
+	public function sc_homepage(): string {
+		$opts    = Settings::get_options();
+		$classes = array_slice( DatabaseHandler::get_classes(), 0, 8 );
+
+		ob_start();
+		include NOOR_TMS_PLUGIN_DIR . 'public/templates/homepage.php';
+		return ob_get_clean();
+	}
+
+	/**
 	 * [noor_tms_login] – Login form.
 	 */
 	public function sc_login(): string {
@@ -253,7 +280,9 @@ class PublicController {
 			$search   = sanitize_text_field( $_GET['noor_search'] ?? ($_GET['s'] ?? '') );
 			$status   = sanitize_key( $_GET['status_filter']        ?? '' );
 			$class_id = (int) ( $_GET['class_id']                   ?? 0 );
-			$paged    = max( 1, (int) ( $_GET['paged']              ?? 1 ) );
+			
+			// Use 'tms_page' to avoid WordPress canonical redirect interference with 'paged'
+			$paged = max( 1, (int) ( $_GET['tms_page'] ?? $_GET['paged'] ?? get_query_var( 'paged' ) ?? 1 ) );
 
 			// Restrict teacher to their assigned classes.
 			if ( ! $is_manager ) {
@@ -269,7 +298,7 @@ class PublicController {
 			}
 
 			$result      = DatabaseHandler::get_students( [
-				'per_page' => 20,
+				'per_page' => 10,
 				'page'     => $paged,
 				'search'   => $search,
 				'status'   => $status,
@@ -277,7 +306,7 @@ class PublicController {
 			] );
 			$students    = $result['rows'];
 			$total       = $result['total'];
-			$total_pages = (int) ceil( $total / 20 );
+			$total_pages = (int) ceil( $total / 10 );
 			$classes     = $is_manager
 				? DatabaseHandler::get_classes_dropdown()
 				: ( isset( $class_ids ) ? array_values( array_filter( DatabaseHandler::get_classes_dropdown(), fn( $c ) => in_array( (int) $c['id'], $class_ids, true ) ) ) : [] );
@@ -702,6 +731,276 @@ class PublicController {
 	}
 
 	/**
+	 * AJAX: submit support request from public homepage popup.
+	 */
+	public function ajax_submit_support_request(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		$ip_key_seed = is_user_logged_in()
+			? 'user_' . get_current_user_id()
+			: 'ip_' . sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) );
+		$rate_key = 'noor_tms_support_rate_' . md5( $ip_key_seed );
+		$attempts = (int) get_transient( $rate_key );
+		if ( $attempts >= 8 ) {
+			wp_send_json_error( [ 'message' => __( 'Too many requests. Please try again in a few minutes.', 'noor-tms' ) ], 429 );
+		}
+		set_transient( $rate_key, $attempts + 1, 10 * MINUTE_IN_SECONDS );
+
+		$name       = sanitize_text_field( wp_unslash( $_POST['support_name'] ?? '' ) );
+		$email      = sanitize_email( wp_unslash( $_POST['support_email'] ?? '' ) );
+		$phone      = sanitize_text_field( wp_unslash( $_POST['support_phone'] ?? '' ) );
+		$subject    = sanitize_text_field( wp_unslash( $_POST['support_subject'] ?? '' ) );
+		$message    = sanitize_textarea_field( wp_unslash( $_POST['support_message'] ?? '' ) );
+		$source_url = esc_url_raw( wp_unslash( $_POST['support_source_url'] ?? '' ) );
+
+		if ( '' === $name || '' === $message ) {
+			wp_send_json_error( [ 'message' => __( 'Please provide your name and message.', 'noor-tms' ) ], 400 );
+		}
+
+		if ( '' === $email && '' === $phone ) {
+			wp_send_json_error( [ 'message' => __( 'Please provide at least one contact method (email or phone).', 'noor-tms' ) ], 400 );
+		}
+
+		if ( '' !== $email && ! is_email( $email ) ) {
+			wp_send_json_error( [ 'message' => __( 'Please provide a valid email address.', 'noor-tms' ) ], 400 );
+		}
+
+		$request_id = DatabaseHandler::insert_support_request(
+			[
+				'user_id'         => get_current_user_id(),
+				'requester_name'  => $name,
+				'requester_email' => $email,
+				'requester_phone' => $phone,
+				'subject'         => '' !== $subject ? $subject : __( 'General Support Request', 'noor-tms' ),
+				'message'         => $message,
+				'source_url'      => $source_url,
+			]
+		);
+
+		if ( ! $request_id ) {
+			wp_send_json_error( [ 'message' => __( 'Unable to save your support request. Please try again.', 'noor-tms' ) ], 500 );
+		}
+
+		$options = Settings::get_options();
+		$mail_to = sanitize_email( $options['support_email'] ?? '' );
+		if ( ! is_email( $mail_to ) ) {
+			$mail_to = sanitize_email( (string) get_option( 'admin_email' ) );
+		}
+
+		$site_name    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$mail_subject = sprintf( __( '[%1$s] New support request #%2$d', 'noor-tms' ), $site_name, $request_id );
+		$mail_body    = implode(
+			"\n",
+			[
+				sprintf( __( 'Request ID: %d', 'noor-tms' ), $request_id ),
+				sprintf( __( 'Name: %s', 'noor-tms' ), $name ),
+				sprintf( __( 'Email: %s', 'noor-tms' ), '' !== $email ? $email : __( '(not provided)', 'noor-tms' ) ),
+				sprintf( __( 'Phone: %s', 'noor-tms' ), '' !== $phone ? $phone : __( '(not provided)', 'noor-tms' ) ),
+				sprintf( __( 'Subject: %s', 'noor-tms' ), '' !== $subject ? $subject : __( 'General Support Request', 'noor-tms' ) ),
+				sprintf( __( 'Source URL: %s', 'noor-tms' ), '' !== $source_url ? $source_url : __( '(not provided)', 'noor-tms' ) ),
+				'',
+				__( 'Message:', 'noor-tms' ),
+				$message,
+			]
+		);
+
+		$headers = [ 'Content-Type: text/plain; charset=UTF-8' ];
+		if ( '' !== $email ) {
+			$headers[] = 'Reply-To: ' . $name . ' <' . $email . '>';
+		}
+
+		$mail_sent = false;
+		if ( is_email( $mail_to ) ) {
+			$mail_sent = (bool) wp_mail( $mail_to, $mail_subject, $mail_body, $headers );
+		}
+
+		do_action(
+			'noor_tms_support_request_received',
+			$request_id,
+			[
+				'name'       => $name,
+				'email'      => $email,
+				'phone'      => $phone,
+				'subject'    => $subject,
+				'message'    => $message,
+				'source_url' => $source_url,
+			],
+			$mail_sent
+		);
+
+		wp_send_json_success(
+			[
+				'request_id' => $request_id,
+				'message'    => sanitize_text_field( $options['support_success_message'] ?? __( 'Your support request has been sent. We will contact you shortly.', 'noor-tms' ) ),
+				'mail_sent'  => $mail_sent,
+			]
+		);
+	}
+
+	/**
+	 * AJAX: bootstrap or resume chat thread.
+	 */
+	public function ajax_chat_bootstrap(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		$thread_id     = (int) ( $_POST['thread_id'] ?? 0 );
+		$visitor_token = $this->normalize_chat_token( sanitize_text_field( wp_unslash( $_POST['visitor_token'] ?? '' ) ) );
+		if ( '' === $visitor_token ) {
+			try {
+				$visitor_token = bin2hex( random_bytes( 16 ) );
+			} catch ( \Exception $e ) {
+				$visitor_token = wp_generate_password( 32, false, false );
+			}
+		}
+
+		$name       = sanitize_text_field( wp_unslash( $_POST['chat_name'] ?? '' ) );
+		$email      = sanitize_email( wp_unslash( $_POST['chat_email'] ?? '' ) );
+		$phone      = sanitize_text_field( wp_unslash( $_POST['chat_phone'] ?? '' ) );
+		$source_url = esc_url_raw( wp_unslash( $_POST['chat_source_url'] ?? '' ) );
+
+		if ( $thread_id > 0 ) {
+			$thread = $this->resolve_chat_thread_access( $thread_id, $visitor_token );
+			if ( ! $thread ) {
+				wp_send_json_error( [ 'message' => __( 'Chat session could not be found.', 'noor-tms' ) ], 404 );
+			}
+		} else {
+			$thread_id = DatabaseHandler::get_or_create_chat_thread(
+				[
+					'user_id'         => get_current_user_id(),
+					'visitor_token'   => $visitor_token,
+					'requester_name'  => $name,
+					'requester_email' => $email,
+					'requester_phone' => $phone,
+					'source_url'      => $source_url,
+				]
+			);
+
+			if ( ! $thread_id ) {
+				wp_send_json_error( [ 'message' => __( 'Unable to create chat session.', 'noor-tms' ) ], 500 );
+			}
+
+			$thread = DatabaseHandler::get_chat_thread( (int) $thread_id );
+		}
+
+		if ( ! $thread ) {
+			wp_send_json_error( [ 'message' => __( 'Chat thread unavailable.', 'noor-tms' ) ], 404 );
+		}
+
+		$messages = DatabaseHandler::get_chat_messages( (int) $thread['id'], 0, 120 );
+		if ( empty( $messages ) ) {
+			$welcome = sanitize_text_field( __( 'Assalamu Alaikum! A support agent will join shortly. Please share your question.', 'noor-tms' ) );
+			DatabaseHandler::insert_chat_message( (int) $thread['id'], 'system', $welcome );
+			$messages = DatabaseHandler::get_chat_messages( (int) $thread['id'], 0, 120 );
+		}
+
+		wp_send_json_success(
+			[
+				'thread' => [
+					'id'            => (int) $thread['id'],
+					'status'        => (string) ( $thread['status'] ?? 'open' ),
+					'visitor_token' => $visitor_token,
+				],
+				'messages' => $this->format_chat_messages( $messages ),
+			]
+		);
+	}
+
+	/**
+	 * AJAX: send visitor chat message.
+	 */
+	public function ajax_chat_send(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		$thread_id     = (int) ( $_POST['thread_id'] ?? 0 );
+		$visitor_token = $this->normalize_chat_token( sanitize_text_field( wp_unslash( $_POST['visitor_token'] ?? '' ) ) );
+		$message       = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
+
+		if ( $thread_id <= 0 || '' === $message ) {
+			wp_send_json_error( [ 'message' => __( 'Message could not be sent.', 'noor-tms' ) ], 400 );
+		}
+
+		$thread = $this->resolve_chat_thread_access( $thread_id, $visitor_token );
+		if ( ! $thread ) {
+			wp_send_json_error( [ 'message' => __( 'Chat session could not be found.', 'noor-tms' ) ], 404 );
+		}
+
+		$message_id = DatabaseHandler::insert_chat_message( $thread_id, 'visitor', $message, get_current_user_id() );
+		if ( ! $message_id ) {
+			wp_send_json_error( [ 'message' => __( 'Unable to send message.', 'noor-tms' ) ], 500 );
+		}
+
+		$options = Settings::get_options();
+		$mail_to = sanitize_email( (string) ( $options['support_email'] ?? '' ) );
+		if ( ! is_email( $mail_to ) ) {
+			$mail_to = sanitize_email( (string) get_option( 'admin_email' ) );
+		}
+
+		if ( is_email( $mail_to ) ) {
+			$site_name    = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+			$sender_name  = is_user_logged_in() ? wp_get_current_user()->display_name : ( (string) ( $thread['requester_name'] ?? __( 'Website visitor', 'noor-tms' ) ) );
+			$mail_subject = sprintf( __( '[%1$s] New chat message (Thread #%2$d)', 'noor-tms' ), $site_name, $thread_id );
+			$mail_body    = implode(
+				"\n",
+				[
+					sprintf( __( 'Thread ID: %d', 'noor-tms' ), $thread_id ),
+					sprintf( __( 'Sender: %s', 'noor-tms' ), $sender_name ),
+					sprintf( __( 'Email: %s', 'noor-tms' ), (string) ( $thread['requester_email'] ?? __( '(not provided)', 'noor-tms' ) ) ),
+					sprintf( __( 'Phone: %s', 'noor-tms' ), (string) ( $thread['requester_phone'] ?? __( '(not provided)', 'noor-tms' ) ) ),
+					'',
+					__( 'Message:', 'noor-tms' ),
+					$message,
+				]
+			);
+			wp_mail( $mail_to, $mail_subject, $mail_body, [ 'Content-Type: text/plain; charset=UTF-8' ] );
+		}
+
+		do_action( 'noor_tms_chat_message_sent', $thread_id, 'visitor', $message, get_current_user_id() );
+
+		$rows = DatabaseHandler::get_chat_messages( $thread_id, max( 0, (int) $message_id - 1 ), 1 );
+		$formatted = $this->format_chat_messages( $rows );
+
+		wp_send_json_success(
+			[
+				'message' => $formatted[0] ?? [
+					'id'           => (int) $message_id,
+					'sender_role'  => 'visitor',
+					'message_text' => $message,
+					'created_at'   => current_time( 'mysql' ),
+				],
+			]
+		);
+	}
+
+	/**
+	 * AJAX: fetch new chat messages.
+	 */
+	public function ajax_chat_fetch(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		$thread_id     = (int) ( $_POST['thread_id'] ?? 0 );
+		$after_id      = max( 0, (int) ( $_POST['after_id'] ?? 0 ) );
+		$visitor_token = $this->normalize_chat_token( sanitize_text_field( wp_unslash( $_POST['visitor_token'] ?? '' ) ) );
+
+		if ( $thread_id <= 0 ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid chat thread.', 'noor-tms' ) ], 400 );
+		}
+
+		$thread = $this->resolve_chat_thread_access( $thread_id, $visitor_token );
+		if ( ! $thread ) {
+			wp_send_json_error( [ 'message' => __( 'Chat session could not be found.', 'noor-tms' ) ], 404 );
+		}
+
+		$messages = DatabaseHandler::get_chat_messages( $thread_id, $after_id, 120 );
+
+		wp_send_json_success(
+			[
+				'messages' => $this->format_chat_messages( $messages ),
+				'status'   => (string) ( $thread['status'] ?? 'open' ),
+			]
+		);
+	}
+
+	/**
 	 * Process student create/update form.
 	 */
 	private function handle_student_save( int $student_id ): void {
@@ -849,7 +1148,12 @@ class PublicController {
 		// Run the exact same method the background cron runs.
 		\Noor_TMS\Includes\FeesCron::generate_monthly_invoices();
 
-		wp_safe_redirect( home_url( '/tms-fees/?tms_action=structures&invoices_generated=1' ) );
+		$redirect_url = home_url( '/tms-fees/?tms_action=structures' );
+		if ( isset( $_SERVER['HTTP_REFERER'] ) && strpos( $_SERVER['HTTP_REFERER'], 'tms_action=invoices' ) !== false ) {
+			$redirect_url = home_url( '/tms-fees/?tms_action=invoices' );
+		}
+
+		wp_safe_redirect( add_query_arg( 'invoices_generated', '1', $redirect_url ) );
 		exit;
 	}
 
@@ -898,18 +1202,74 @@ class PublicController {
 			wp_die( esc_html__( 'Security check failed.', 'noor-tms' ) );
 		}
 
-		$allowed_providers = [ 'click_to_chat', 'mock', 'ultramsg', 'twilio' ];
-		$provider          = sanitize_key( $_POST['gateway_provider'] ?? 'click_to_chat' );
-
-		update_option( 'noor_tms_options', [
-			'gateway_provider' => in_array( $provider, $allowed_providers, true ) ? $provider : 'click_to_chat',
-			'api_instance_id'  => sanitize_text_field( $_POST['api_instance_id']  ?? '' ),
-			'api_token'        => sanitize_text_field( $_POST['api_token']         ?? '' ),
-			'sender_number'    => sanitize_text_field( $_POST['sender_number']     ?? '' ),
-			'message_template' => wp_kses_post( $_POST['message_template']         ?? '' ),
-		] );
+		update_option( 'noor_tms_options', Settings::sanitize_options_input( $_POST ) );
 
 		wp_safe_redirect( add_query_arg( 'msg', 'saved', home_url( '/tms-settings/' ) ) );
 		exit;
+	}
+
+	/**
+	 * Validate and normalize visitor token used by public chat widget.
+	 *
+	 * @param string $token
+	 * @return string
+	 */
+	private function normalize_chat_token( string $token ): string {
+		$normalized = preg_replace( '/[^a-z0-9]/', '', strtolower( $token ) );
+		if ( ! is_string( $normalized ) ) {
+			$normalized = '';
+		}
+		return substr( $normalized, 0, 64 );
+	}
+
+	/**
+	 * Check whether current request can access the given chat thread.
+	 *
+	 * @param int    $thread_id
+	 * @param string $visitor_token
+	 * @return array<string, mixed>|null
+	 */
+	private function resolve_chat_thread_access( int $thread_id, string $visitor_token ): ?array {
+		$thread = DatabaseHandler::get_chat_thread( $thread_id );
+		if ( ! $thread ) {
+			return null;
+		}
+
+		$thread_user_id  = (int) ( $thread['user_id'] ?? 0 );
+		$current_user_id = get_current_user_id();
+
+		if ( $thread_user_id > 0 ) {
+			if ( $thread_user_id === $current_user_id || current_user_can( 'noor_tms_manage' ) ) {
+				return $thread;
+			}
+			return null;
+		}
+
+		$thread_token = (string) ( $thread['visitor_token'] ?? '' );
+		if ( '' !== $visitor_token && '' !== $thread_token && hash_equals( $thread_token, $visitor_token ) ) {
+			return $thread;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Normalize chat message rows for frontend JSON consumption.
+	 *
+	 * @param array<int, array<string, mixed>> $rows
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function format_chat_messages( array $rows ): array {
+		$messages = [];
+		foreach ( $rows as $row ) {
+			$messages[] = [
+				'id'           => (int) ( $row['id'] ?? 0 ),
+				'sender_role'  => sanitize_key( (string) ( $row['sender_role'] ?? 'visitor' ) ),
+				'message_text' => (string) ( $row['message_text'] ?? '' ),
+				'created_at'   => (string) ( $row['created_at'] ?? '' ),
+			];
+		}
+
+		return $messages;
 	}
 }

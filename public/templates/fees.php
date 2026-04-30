@@ -66,7 +66,24 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 		</div>
 
 	<?php elseif ( 'invoices' === $action ) : ?>
-		<h2 style="margin-top:0;"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></h2>
+		<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+			<div>
+				<h2 style="margin-top:0;"><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></h2>
+				<p style="color: var(--tms-muted); margin-bottom: 0;"><?php esc_html_e( 'View and manage auto-generated fee invoices.', 'noor-tms' ); ?></p>
+			</div>
+			
+			<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+				<input type="hidden" name="action" value="noor_tms_generate_frontend_invoices">
+				<?php wp_nonce_field( 'noor_tms_trigger_invoices' ); ?>
+				<button type="submit" class="noor-btn" style="background-color: var(--tms-link); color: #c36;"><?php esc_html_e( 'Generate Current Month Invoices ', 'noor-tms' ); ?></button>
+			</form>
+		</div>
+
+		<?php if ( ! empty( $_GET['invoices_generated'] ) ) : ?>
+			<div class="noor-notice noor-notice--success" style="margin-bottom: 20px;">
+				<?php esc_html_e( 'Invoices successfully generated and assigned to all eligible active students.', 'noor-tms' ); ?>
+			</div>
+		<?php endif; ?>
 		
 		<?php
 		$invoices = \Noor_TMS\Includes\DatabaseHandler::get_invoices();
@@ -284,7 +301,7 @@ include NOOR_TMS_PLUGIN_DIR . 'public/templates/layout.php';
 				<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
 					<input type="hidden" name="action" value="noor_tms_generate_frontend_invoices">
 					<?php wp_nonce_field( 'noor_tms_trigger_invoices' ); ?>
-					<button type="submit" class="noor-btn" style="background-color: var(--tms-link); color: white;"><?php esc_html_e( 'Generate Missing Invoices Now', 'noor-tms' ); ?></button>
+					<button type="submit" class="noor-btn" style="background-color: var(--tms-link); color: #c36;"><?php esc_html_e( 'Generate Missing Invoices Now', 'noor-tms' ); ?></button>
 				</form>
 			</div>
 

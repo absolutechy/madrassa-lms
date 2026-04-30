@@ -73,7 +73,8 @@ if ( $is_manager ) {
 	     ================================================================ -->
 	<aside class="noor-tms-sidebar">
 		<div class="noor-tms-sidebar__brand">
-			<h2>&#128218; Noor-TMS</h2>
+			<img src="<?php echo esc_url( plugins_url( 'public/images/madrassa-logo.png', dirname( dirname( __FILE__ ) ) ) ); ?>" alt="Madrassa Logo" class="noor-sidebar-logo">
+			<h2 dir="rtl">جَامِعَةُ عَبْدِ اللهِ ابْنِ عَبَّاسٍ</h2>
 			<span><?php esc_html_e( 'Madrasa Portal', 'noor-tms' ); ?></span>
 		</div>
 

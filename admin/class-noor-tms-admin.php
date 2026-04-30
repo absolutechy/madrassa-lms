@@ -7,8 +7,6 @@
 
 namespace Noor_TMS\Admin;
 
-use Noor_TMS\Includes\DatabaseHandler;
-
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -23,6 +21,8 @@ class Admin {
 	private Teachers   $teachers;
 	private Attendance $attendance;
 	private Fees       $fees;
+	private Support    $support;
+	private \Noor_TMS\Admin\Chat $chat;
 
 	public function __construct() {
 		$this->students   = new Students();
@@ -32,6 +32,8 @@ class Admin {
 		$this->teachers   = new Teachers();
 		$this->attendance = new Attendance();
 		$this->fees       = new Fees();
+		$this->support    = new Support();
+		$this->chat       = new \Noor_TMS\Admin\Chat();
 	}
 
 	// -----------------------------------------------------------------------
@@ -132,6 +134,31 @@ class Admin {
 			'noor-tms-fees',
 			[ $this->fees, 'render_page' ]
 		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Live Chat', 'noor-tms' ),
+			__( 'Live Chat', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-chat',
+			[ $this->chat, 'page_chat' ]
+		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Support Inbox', 'noor-tms' ),
+			__( 'Support Inbox', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-support',
+			[ $this->support, 'page_support' ]
+		);
+	}
+
+	/**
+	 * Handle admin POST actions before page output.
+	 */
+	public function handle_admin_actions(): void {
+		$this->chat->maybe_handle_actions();
 	}
 
 	// -----------------------------------------------------------------------
@@ -154,6 +181,8 @@ class Admin {
 			'noor-tms_page_noor-tms-attendance',
 			'noor-tms_page_noor-tms-teacher-attendance',
 			'noor-tms_page_noor-tms-fees',
+			'noor-tms_page_noor-tms-chat',
+			'noor-tms_page_noor-tms-support',
 		];
 
 		if ( ! in_array( $hook_suffix, $noor_pages, true ) ) {
@@ -236,5 +265,9 @@ class Admin {
 
 	public function ajax_save_teacher_attendance(): void {
 		$this->teachers->ajax_save_teacher_attendance();
+	}
+
+	public function handle_print_student(): void {
+		$this->students->handle_print_student();
 	}
 }

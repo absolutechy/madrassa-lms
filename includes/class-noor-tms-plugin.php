@@ -61,6 +61,11 @@ final class Plugin {
 			$this,
 			'load_plugin_textdomain'
 		);
+		$this->loader->add_action(
+			'plugins_loaded',
+			$this,
+			'maybe_upgrade_database'
+		);
 	}
 
 	/**
@@ -69,6 +74,7 @@ final class Plugin {
 	private function define_admin_hooks(): void {
 		$admin = new \Noor_TMS\Admin\Admin();
 
+		$this->loader->add_action( 'admin_init',           $admin, 'handle_admin_actions' );
 		$this->loader->add_action( 'admin_menu',            $admin, 'register_menus' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_assets' );
 
@@ -83,6 +89,7 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_noor_tms_delete_teacher',            $admin, 'ajax_delete_teacher' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_student_attendance',   $admin, 'ajax_save_student_attendance' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_teacher_attendance',   $admin, 'ajax_save_teacher_attendance' );
+		$this->loader->add_action( 'admin_post_noor_tms_print_student',          $admin, 'handle_print_student' );
 	}
 
 	// -----------------------------------------------------------------------
@@ -99,6 +106,14 @@ final class Plugin {
 		$this->loader->add_action( 'wp_enqueue_scripts', $public, 'enqueue_assets' );
 		$this->loader->add_action( 'template_redirect',  $public, 'handle_early_requests' );
 		$this->loader->add_filter( 'login_redirect',     $public, 'redirect_after_login', 10, 3 );
+		$this->loader->add_action( 'wp_ajax_noor_tms_submit_support_request',        $public, 'ajax_submit_support_request' );
+		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_submit_support_request', $public, 'ajax_submit_support_request' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_chat_bootstrap',        $public, 'ajax_chat_bootstrap' );
+		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_chat_bootstrap', $public, 'ajax_chat_bootstrap' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_chat_send',        $public, 'ajax_chat_send' );
+		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_chat_send', $public, 'ajax_chat_send' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_chat_fetch',        $public, 'ajax_chat_fetch' );
+		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_chat_fetch', $public, 'ajax_chat_fetch' );
 
 		// admin-post.php handlers (front-end form submissions).
 		$this->loader->add_action( 'admin_post_noor_tms_save_student',  $public, 'process_student_form' );
@@ -134,5 +149,15 @@ final class Plugin {
 			false,
 			dirname( NOOR_TMS_PLUGIN_BASE ) . '/languages/'
 		);
+	}
+
+	/**
+	 * Run schema upgrades for existing installs.
+	 */
+	public function maybe_upgrade_database(): void {
+		$installed = (string) get_option( 'noor_tms_db_version', '1.0' );
+		if ( version_compare( $installed, '6.0', '<' ) ) {
+			DatabaseHandler::create_tables();
+		}
 	}
 }

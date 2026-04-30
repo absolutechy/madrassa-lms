@@ -41,6 +41,10 @@ class Activator {
 	 */
 	private static function create_default_pages(): void {
 		$pages = [
+			'tms-home'       => [
+				'title'   => 'TMS Home',
+				'content' => '[noor_tms_homepage]',
+			],
 			'tms-login'      => [
 				'title'   => 'TMS Login',
 				'content' => '[noor_tms_login]',

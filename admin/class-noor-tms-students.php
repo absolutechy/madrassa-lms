@@ -92,30 +92,24 @@ class Students {
 
 			<script>
             function applyNoorFilter() {
-                const url = new URL(window.location.href);
-                
-                // Clear existing parameters
-                url.searchParams.delete('noor_search');
-                url.searchParams.delete('s');
-                url.searchParams.delete('class_id');
-                url.searchParams.delete('status_filter');
-                url.searchParams.delete('paged');
-                
-                // Add page param if in admin
+				const params = [];
+
+				// Keep target page when in admin.
                 const pageInput = document.getElementById('noor_page');
-                if (pageInput) {
-                    url.searchParams.set('page', pageInput.value);
+				if (pageInput && pageInput.value) {
+					params.push('page=' + encodeURIComponent(pageInput.value));
                 }
                 
                 const search = document.getElementById('noor_search_input').value.trim();
                 const classId = document.getElementById('noor_class_id').value;
                 const status = document.getElementById('noor_status_filter').value;
                 
-                if (search) url.searchParams.set('noor_search', search);
-                if (classId) url.searchParams.set('class_id', classId);
-                if (status) url.searchParams.set('status_filter', status);
+				if (search) params.push('noor_search=' + encodeURIComponent(search));
+				if (classId) params.push('class_id=' + encodeURIComponent(classId));
+				if (status) params.push('status_filter=' + encodeURIComponent(status));
                 
-                window.location.href = url.toString();
+				const query = params.length ? ('?' + params.join('&')) : '';
+				window.location.href = window.location.pathname + query;
             }
 
             // Also attach Enter key on search input
@@ -184,10 +178,14 @@ class Students {
 										   class="button button-small"><?php esc_html_e( 'Results', 'noor-tms' ); ?></a>
 									<?php endif; ?>
 
-				<button type="button" class="button button-small button-link-delete noor-delete-student"
-						data-id="<?php echo esc_attr( $student['id'] ); ?>">
-					<?php esc_html_e( 'Delete', 'noor-tms' ); ?>
-				</button>
+									<a href="<?php echo esc_url( $this->get_print_student_url( (int) $student['id'] ) ); ?>"
+									   class="button button-small"
+									   target="_blank"
+									   rel="noopener"><?php esc_html_e( 'Print PDF', 'noor-tms' ); ?></a>
+									<a href="<php echo esc_url( wp_nonce_url( add_query_arg( [ 'action' => 'noor_tms_delete_student', 'student_id' => $student['id'] ], admin_url( 'admin-post.php' ) ), 'noor_tms_delete_student_' . (int) $student['id'] ) ) ); ?>"
+									   class="button button-small"
+									   onclick="return confirm('<?php esc_attr_e( 'Are you sure you want to delete this student?', 'noor-tms' ); ?>');">
+										<?php esc_html_e( 'Delete', 'noor-tms' ); ?></a>
 								</td>
 							</tr>
 						<?php endforeach; ?>
@@ -349,6 +347,12 @@ class Students {
 					</tr>
 					<div class="noor-form-actions">
 						<?php submit_button( $student ? __( 'Update Student', 'noor-tms' ) : __( 'Add Student', 'noor-tms' ), 'primary', 'submit', false ); ?>
+						<?php if ( $student_id > 0 ) : ?>
+							<a href="<?php echo esc_url( $this->get_print_student_url( $student_id ) ); ?>"
+							   class="button"
+							   target="_blank"
+							   rel="noopener"><?php esc_html_e( 'Print PDF', 'noor-tms' ); ?></a>
+						<?php endif; ?>
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms' ) ); ?>" class="button">
 							<?php esc_html_e( 'Cancel', 'noor-tms' ); ?>
 						</a>
@@ -444,9 +448,494 @@ class Students {
 		}
 	}
 
+	public function handle_print_student(): void {
+		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_teacher = current_user_can( 'noor_tms_teacher' );
+
+		if ( ! $is_manager && ! $is_teacher ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
+		}
+
+		$student_id = (int) ( $_GET['student_id'] ?? 0 );
+		if ( $student_id <= 0 ) {
+			wp_die( esc_html__( 'Invalid student ID.', 'noor-tms' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ?? '' ) );
+		if ( ! wp_verify_nonce( $nonce, 'noor_tms_print_student_' . $student_id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'noor-tms' ) );
+		}
+
+		$month = (int) ( $_GET['month'] ?? current_time( 'n' ) );
+		$year  = (int) ( $_GET['year'] ?? current_time( 'Y' ) );
+
+		$month = max( 1, min( 12, $month ) );
+		$year  = max( 2000, min( 2100, $year ) );
+
+		$student = DatabaseHandler::get_student( $student_id );
+		if ( ! $student ) {
+			wp_die( esc_html__( 'Student not found.', 'noor-tms' ) );
+		}
+
+		if ( ! $is_manager ) {
+			$teacher   = DatabaseHandler::get_teacher_by_user( get_current_user_id() );
+			$class_ids = $teacher ? DatabaseHandler::get_teacher_class_ids( (int) $teacher['id'] ) : [];
+
+			if ( empty( $student['class_id'] ) || ! in_array( (int) $student['class_id'], $class_ids, true ) ) {
+				wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
+			}
+		}
+
+		$results = DatabaseHandler::get_results_by_student( $student_id );
+
+		$attendance_map = DatabaseHandler::get_student_attendance_summary(
+			$month,
+			$year,
+			! empty( $student['class_id'] ) ? (int) $student['class_id'] : null
+		);
+		$attendance  = $attendance_map[ $student_id ] ?? null;
+		$fee_summary = DatabaseHandler::get_student_fee_summary( $student_id );
+
+		$this->render_print_student_report( $student, $results, $attendance, $fee_summary, $month, $year );
+		exit;
+	}
+
+	/**
+	 * Render a print-friendly report page for a student.
+	 *
+	 * @param array<string, mixed>      $student
+	 * @param array<int, array<string, mixed>> $results
+	 * @param array<string, mixed>|null $attendance
+	 * @param array<string, int|float>  $fee_summary
+	 * @param int                       $month
+	 * @param int                       $year
+	 */
+	private function render_print_student_report( array $student, array $results, ?array $attendance, array $fee_summary, int $month, int $year ): void {
+		$student_id    = (int) ( $student['id'] ?? 0 );
+		$current_year  = (int) current_time( 'Y' );
+		$year_start    = max( 2000, $current_year - 5 );
+		$year_end      = $current_year + 1;
+		$month_name    = wp_date( 'F', mktime( 0, 0, 0, $month, 1, $year ) );
+		$generated_on  = current_time( 'mysql' );
+		$student_photo = ! empty( $student['photo_id'] ) ? wp_get_attachment_image_url( (int) $student['photo_id'], 'medium' ) : '';
+
+		$total_obtained = 0.0;
+		$total_marks    = 0.0;
+
+		foreach ( $results as $result_row ) {
+			$total_obtained += (float) ( $result_row['marks_obtained'] ?? 0 );
+			$total_marks    += (float) ( $result_row['total_marks'] ?? 0 );
+		}
+
+		$overall_pct = $total_marks > 0 ? ( $total_obtained / $total_marks ) * 100 : 0;
+
+		nocache_headers();
+		?>
+		<!doctype html>
+		<html <?php language_attributes(); ?>>
+		<head>
+			<meta charset="<?php bloginfo( 'charset' ); ?>">
+			<meta name="viewport" content="width=device-width, initial-scale=1">
+			<title><?php echo esc_html( sprintf( __( 'Student Report - %s', 'noor-tms' ), (string) ( $student['name'] ?? '' ) ) ); ?></title>
+			<style>
+				:root {
+					--noor-bg: #f3f6fb;
+					--noor-paper: #ffffff;
+					--noor-text: #1f2937;
+					--noor-muted: #6b7280;
+					--noor-border: #dbe3ef;
+					--noor-primary: #0f766e;
+				}
+
+				* { box-sizing: border-box; }
+
+				body {
+					margin: 0;
+					padding: 24px;
+					background: radial-gradient(circle at top right, #e5f4ff 0%, var(--noor-bg) 45%, #eef5ff 100%);
+					color: var(--noor-text);
+					font-family: "Segoe UI", Tahoma, sans-serif;
+					line-height: 1.5;
+				}
+
+				.report-shell {
+					max-width: 980px;
+					margin: 0 auto;
+				}
+
+				.report-toolbar {
+					display: flex;
+					justify-content: space-between;
+					gap: 12px;
+					align-items: center;
+					margin-bottom: 16px;
+					padding: 12px;
+					border: 1px solid var(--noor-border);
+					background: #f9fbff;
+					border-radius: 12px;
+					flex-wrap: wrap;
+				}
+
+				.report-filters {
+					display: flex;
+					gap: 8px;
+					align-items: center;
+					flex-wrap: wrap;
+				}
+
+				.report-filters label {
+					font-size: 12px;
+					color: var(--noor-muted);
+				}
+
+				.report-filters select,
+				.report-filters button,
+				.report-actions button,
+				.report-actions a {
+					height: 34px;
+					border-radius: 8px;
+					border: 1px solid #b8c7dd;
+					padding: 0 12px;
+					background: #fff;
+					color: #1f2937;
+					font-size: 13px;
+					text-decoration: none;
+					cursor: pointer;
+				}
+
+				.report-filters button,
+				.report-actions .button-primary {
+					background: var(--noor-primary);
+					border-color: var(--noor-primary);
+					color: #fff;
+				}
+
+				.report-actions {
+					display: flex;
+					gap: 8px;
+				}
+
+				.report-paper {
+					background: var(--noor-paper);
+					border: 1px solid var(--noor-border);
+					border-radius: 14px;
+					padding: 22px;
+					box-shadow: 0 20px 45px rgba(17, 24, 39, 0.08);
+				}
+
+				.report-header {
+					display: flex;
+					justify-content: space-between;
+					gap: 16px;
+					align-items: flex-start;
+					padding-bottom: 14px;
+					border-bottom: 2px solid #edf2fb;
+				}
+
+				.report-title {
+					margin: 0;
+					font-size: 28px;
+					line-height: 1.2;
+				}
+
+				.report-meta {
+					font-size: 13px;
+					color: var(--noor-muted);
+					text-align: right;
+				}
+
+				.section {
+					margin-top: 18px;
+				}
+
+				.section h2 {
+					margin: 0 0 10px;
+					font-size: 17px;
+				}
+
+				.profile-layout {
+					display: grid;
+					grid-template-columns: 96px minmax(0, 1fr);
+					gap: 14px;
+				}
+
+				.profile-photo {
+					width: 96px;
+					height: 96px;
+					border-radius: 10px;
+					object-fit: cover;
+					border: 1px solid var(--noor-border);
+				}
+
+				.profile-grid,
+				.summary-grid {
+					display: grid;
+					gap: 8px;
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+				}
+
+				.field {
+					border: 1px solid var(--noor-border);
+					border-radius: 10px;
+					padding: 10px 12px;
+					background: #fbfdff;
+				}
+
+				.field small {
+					display: block;
+					font-size: 11px;
+					color: var(--noor-muted);
+					text-transform: uppercase;
+					letter-spacing: 0.04em;
+				}
+
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					font-size: 13px;
+				}
+
+				th,
+				td {
+					border: 1px solid var(--noor-border);
+					padding: 8px 10px;
+					text-align: left;
+				}
+
+				th {
+					background: #f1f7ff;
+					font-weight: 600;
+				}
+
+				.alert {
+					margin: 0;
+					padding: 11px 12px;
+					background: #fff8e8;
+					border: 1px solid #f7e4b2;
+					border-radius: 9px;
+					color: #7a5b00;
+				}
+
+				@media (max-width: 760px) {
+					body { padding: 14px; }
+					.report-paper { padding: 14px; }
+					.profile-layout { grid-template-columns: 1fr; }
+					.profile-grid,
+					.summary-grid { grid-template-columns: 1fr; }
+					.report-meta { text-align: left; }
+				}
+
+				@media print {
+					body { padding: 0; background: #fff; }
+					.no-print { display: none !important; }
+					.report-paper {
+						border: 0;
+						box-shadow: none;
+						border-radius: 0;
+						padding: 0;
+					}
+					@page {
+						size: A4;
+						margin: 12mm;
+					}
+				}
+			</style>
+		</head>
+		<body>
+			<div class="report-shell">
+				<div class="report-toolbar no-print">
+					<form method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="report-filters">
+						<input type="hidden" name="action" value="noor_tms_print_student" />
+						<input type="hidden" name="student_id" value="<?php echo esc_attr( $student_id ); ?>" />
+						<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( wp_create_nonce( 'noor_tms_print_student_' . $student_id ) ); ?>" />
+
+						<label for="noor-print-month"><?php esc_html_e( 'Month', 'noor-tms' ); ?></label>
+						<select id="noor-print-month" name="month">
+							<?php for ( $m = 1; $m <= 12; $m++ ) : ?>
+								<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $month, $m ); ?>>
+									<?php echo esc_html( wp_date( 'F', mktime( 0, 0, 0, $m, 1, max( 2000, $year ) ) ) ); ?>
+								</option>
+							<?php endfor; ?>
+						</select>
+
+						<label for="noor-print-year"><?php esc_html_e( 'Year', 'noor-tms' ); ?></label>
+						<select id="noor-print-year" name="year">
+							<?php for ( $y = $year_start; $y <= $year_end; $y++ ) : ?>
+								<option value="<?php echo esc_attr( $y ); ?>" <?php selected( $year, $y ); ?>>
+									<?php echo esc_html( $y ); ?>
+								</option>
+							<?php endfor; ?>
+						</select>
+
+						<button type="submit"><?php esc_html_e( 'Update', 'noor-tms' ); ?></button>
+					</form>
+
+					<div class="report-actions">
+						<button type="button" class="button-primary" onclick="window.print();"><?php esc_html_e( 'Print', 'noor-tms' ); ?></button>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms' ) ); ?>"><?php esc_html_e( 'Close', 'noor-tms' ); ?></a>
+					</div>
+				</div>
+
+				<div class="report-paper">
+					<header class="report-header">
+						<div>
+							<h1 class="report-title"><?php esc_html_e( 'Student Report', 'noor-tms' ); ?></h1>
+							<p style="margin:4px 0 0;color:#6b7280;">
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: 1: month name, 2: year */
+										__( 'Attendance period: %1$s %2$d', 'noor-tms' ),
+										$month_name,
+										$year
+									)
+								);
+								?>
+							</p>
+						</div>
+						<div class="report-meta">
+							<div><?php echo esc_html( sprintf( __( 'Generated: %s', 'noor-tms' ), $generated_on ) ); ?></div>
+							<div><?php echo esc_html( sprintf( __( 'Student ID: %d', 'noor-tms' ), $student_id ) ); ?></div>
+						</div>
+					</header>
+
+					<section class="section">
+						<h2><?php esc_html_e( 'Student Profile', 'noor-tms' ); ?></h2>
+						<div class="profile-layout">
+							<div>
+								<?php if ( $student_photo ) : ?>
+									<img src="<?php echo esc_url( $student_photo ); ?>" alt="" class="profile-photo" />
+								<?php endif; ?>
+							</div>
+							<div class="profile-grid">
+								<div class="field">
+									<small><?php esc_html_e( 'Full Name', 'noor-tms' ); ?></small>
+									<?php echo esc_html( (string) ( $student['name'] ?? '' ) ); ?>
+								</div>
+								<div class="field">
+									<small><?php esc_html_e( 'Class', 'noor-tms' ); ?></small>
+									<?php echo esc_html( (string) ( $student['class_name'] ?? __( 'Unassigned', 'noor-tms' ) ) ); ?>
+								</div>
+								<div class="field">
+									<small><?php esc_html_e( "Parent's WhatsApp", 'noor-tms' ); ?></small>
+									<?php echo esc_html( (string) ( $student['parent_phone'] ?? '-' ) ); ?>
+								</div>
+								<div class="field">
+									<small><?php esc_html_e( 'Enrollment Date', 'noor-tms' ); ?></small>
+									<?php echo esc_html( (string) ( $student['enrollment_date'] ?? '-' ) ); ?>
+								</div>
+								<div class="field">
+									<small><?php esc_html_e( 'Status', 'noor-tms' ); ?></small>
+									<?php echo esc_html( ucfirst( (string) ( $student['status'] ?? 'active' ) ) ); ?>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<section class="section">
+						<h2><?php esc_html_e( 'Exam Results', 'noor-tms' ); ?></h2>
+						<?php if ( empty( $results ) ) : ?>
+							<p class="alert"><?php esc_html_e( 'No exam results found for this student.', 'noor-tms' ); ?></p>
+						<?php else : ?>
+							<table>
+								<thead>
+									<tr>
+										<th><?php esc_html_e( 'Subject', 'noor-tms' ); ?></th>
+										<th><?php esc_html_e( 'Marks', 'noor-tms' ); ?></th>
+										<th><?php esc_html_e( 'Percentage', 'noor-tms' ); ?></th>
+										<th><?php esc_html_e( 'Exam Date', 'noor-tms' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $results as $result_row ) : ?>
+										<?php
+										$obtained   = (float) ( $result_row['marks_obtained'] ?? 0 );
+										$total      = (float) ( $result_row['total_marks'] ?? 0 );
+										$result_pct = $total > 0 ? ( $obtained / $total ) * 100 : 0;
+										?>
+										<tr>
+											<td><?php echo esc_html( (string) ( $result_row['subject'] ?? '' ) ); ?></td>
+											<td><?php echo esc_html( sprintf( '%s / %s', number_format_i18n( $obtained, 2 ), number_format_i18n( $total, 2 ) ) ); ?></td>
+											<td><?php echo esc_html( number_format_i18n( $result_pct, 2 ) . '%' ); ?></td>
+											<td><?php echo esc_html( (string) ( $result_row['exam_date'] ?? '-' ) ); ?></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+							<div style="margin-top:10px;" class="summary-grid">
+								<div class="field">
+									<small><?php esc_html_e( 'Total Obtained', 'noor-tms' ); ?></small>
+									<?php echo esc_html( number_format_i18n( $total_obtained, 2 ) ); ?>
+								</div>
+								<div class="field">
+									<small><?php esc_html_e( 'Overall Percentage', 'noor-tms' ); ?></small>
+									<?php echo esc_html( number_format_i18n( $overall_pct, 2 ) . '%' ); ?>
+								</div>
+							</div>
+						<?php endif; ?>
+					</section>
+
+					<section class="section">
+						<h2><?php esc_html_e( 'Attendance Summary', 'noor-tms' ); ?></h2>
+						<?php if ( empty( $attendance ) ) : ?>
+							<p class="alert"><?php esc_html_e( 'No attendance records found for the selected month.', 'noor-tms' ); ?></p>
+						<?php else : ?>
+							<div class="summary-grid">
+								<div class="field"><small><?php esc_html_e( 'Present', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['present'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Absent', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['absent'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Late', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['late'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Excused', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['excused'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Total Days', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['total_days'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Attendance %', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $attendance['pct'] ?? 0 ), 2 ) . '%' ); ?></div>
+							</div>
+						<?php endif; ?>
+					</section>
+
+					<section class="section">
+						<h2><?php esc_html_e( 'Fee Summary', 'noor-tms' ); ?></h2>
+						<?php if ( (int) ( $fee_summary['invoice_count'] ?? 0 ) === 0 ) : ?>
+							<p class="alert"><?php esc_html_e( 'No fee records found for this student.', 'noor-tms' ); ?></p>
+						<?php else : ?>
+							<div class="summary-grid">
+								<div class="field"><small><?php esc_html_e( 'Total Due', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['total_due'] ?? 0 ), 2 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Total Paid', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['total_paid'] ?? 0 ), 2 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Balance', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['balance'] ?? 0 ), 2 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $fee_summary['invoice_count'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Paid Invoices', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $fee_summary['paid_count'] ?? 0 ) ); ?></div>
+								<div class="field"><small><?php esc_html_e( 'Partial/Unpaid', 'noor-tms' ); ?></small><?php echo esc_html( ( (int) ( $fee_summary['partial_count'] ?? 0 ) + (int) ( $fee_summary['unpaid_count'] ?? 0 ) ) ); ?></div>
+							</div>
+						<?php endif; ?>
+					</section>
+				</div>
+			</div>
+		</body>
+		</html>
+		<?php
+	}
+
 	// -----------------------------------------------------------------------
 	// Helpers
 	// -----------------------------------------------------------------------
+
+	private function get_print_student_url( int $student_id, ?int $month = null, ?int $year = null ): string {
+		$month = (int) ( $month ?: current_time( 'n' ) );
+		$year  = (int) ( $year  ?: current_time( 'Y' ) );
+
+		$month = max( 1, min( 12, $month ) );
+		$year  = max( 2000, min( 2100, $year ) );
+
+		$url = add_query_arg(
+			[
+				'action'     => 'noor_tms_print_student',
+				'student_id' => $student_id,
+				'month'      => $month,
+				'year'       => $year,
+			],
+			admin_url( 'admin-post.php' )
+		);
+
+		return wp_nonce_url( $url, 'noor_tms_print_student_' . $student_id );
+	}
 
 	private function render_notices(): void {
 		$msg = sanitize_key( $_GET['msg'] ?? '' );

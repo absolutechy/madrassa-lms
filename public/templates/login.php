@@ -12,9 +12,9 @@ defined( 'ABSPATH' ) || exit;
 	<div class="noor-login-card">
 
 		<div class="noor-login-card__logo">
-			<div class="noor-logo-icon">&#128218;</div>
-			<div>
-				<h1><?php esc_html_e( 'Noor-TMS', 'noor-tms' ); ?></h1>
+			<img src="<?php echo esc_url( plugins_url( 'public/images/madrassa-logo.png', dirname( dirname( __FILE__ ) ) ) ); ?>" alt="Madrassa Logo" class="noor-logo-image">
+			<div class="noor-logo-text" dir="rtl">
+				<h1>جَامِعَةُ عَبْدِ اللهِ ابْنِ عَبَّاسٍ</h1>
 				<p><?php esc_html_e( 'Madrasa Management System', 'noor-tms' ); ?></p>
 			</div>
 		</div>

@@ -53,14 +53,63 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 2.  Delete student row
+    // 2.  Student quick-actions dropdown
+    // -----------------------------------------------------------------------
+    $( '.noor-actions-dropdown' ).prop( 'hidden', true );
+
+    $( document ).on( 'click', '.noor-actions-toggle', function ( e ) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $menu = $( this ).closest( '.noor-actions-menu' );
+        const $dropdown = $menu.find( '.noor-actions-dropdown' );
+        const willOpen = ! $menu.hasClass( 'is-open' );
+
+        closeAllActionMenus();
+
+        if ( willOpen ) {
+            $menu.addClass( 'is-open' );
+            $( this ).attr( 'aria-expanded', 'true' );
+            $dropdown.prop( 'hidden', false );
+        }
+    } );
+
+    $( document ).on( 'click', function () {
+        closeAllActionMenus();
+    } );
+
+    $( document ).on( 'click', '.noor-actions-dropdown', function ( e ) {
+        e.stopPropagation();
+    } );
+
+    $( document ).on( 'click', '.noor-actions-link', function () {
+        closeAllActionMenus();
+    } );
+
+    $( document ).on( 'keyup', function ( e ) {
+        if ( e.key === 'Escape' ) {
+            closeAllActionMenus();
+        }
+    } );
+
+    function closeAllActionMenus() {
+        $( '.noor-actions-menu' ).each( function () {
+            const $menu = $( this );
+            $menu.removeClass( 'is-open' );
+            $menu.find( '.noor-actions-toggle' ).attr( 'aria-expanded', 'false' );
+            $menu.find( '.noor-actions-dropdown' ).prop( 'hidden', true );
+        } );
+    }
+
+    // -----------------------------------------------------------------------
+    // 3.  Delete student row
     // -----------------------------------------------------------------------
     $( document ).on( 'click', '.noor-delete-student', function () {
         if ( ! confirm( noorTMS.i18n.confirmDelete ) ) return;
 
         const $btn      = $( this );
         const studentId = $btn.data( 'id' );
-        const nonce     = $btn.data( 'nonce' );
+        const nonce     = $btn.data( 'nonce' ) || noorTMS.nonce;
         const $row      = $btn.closest( 'tr' );
 
         $btn.prop( 'disabled', true ).text( noorTMS.i18n.deleting );
@@ -72,6 +121,7 @@
         } )
         .done( function ( response ) {
             if ( response.success ) {
+                alert( response.data.message || 'Student deleted successfully.' );
                 $row.fadeOut( 300, function () { $( this ).remove(); } );
             } else {
                 alert( response.data.message || noorTMS.i18n.error );
@@ -85,7 +135,7 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 3.  Delete result row
+    // 4.  Delete result row
     // -----------------------------------------------------------------------
     $( document ).on( 'click', '.noor-delete-result', function () {
         if ( ! confirm( noorTMS.i18n.confirmDelete ) ) return;
@@ -117,7 +167,7 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 4.  Delete class card
+    // 5.  Delete class card
     // -----------------------------------------------------------------------
     $( document ).on( 'click', '.noor-delete-class', function () {
         const $btn    = $( this );
@@ -152,7 +202,7 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 5.  Subject row management (class form)
+    // 6.  Subject row management (class form)
     // -----------------------------------------------------------------------
     $( document ).on( 'click', '#noor-add-subject', function () {
         const $row = $(
@@ -178,7 +228,7 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 6.  Settings – toggle API field visibility based on provider
+    // 7.  Settings – toggle API field visibility based on provider
     // -----------------------------------------------------------------------
     $( document ).on( 'change', '#gateway_provider', toggleApiRows );
     $( document ).ready( function () { toggleApiRows(); } );
@@ -206,7 +256,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // 7.  Attendance – mark attendance (public portal)
+    // 8.  Attendance – mark attendance (public portal)
     // -----------------------------------------------------------------------
 
     // Quick mark – set all selects to a given status.
@@ -252,5 +302,512 @@
             $btn.prop( 'disabled', false );
         } );
     } );
+
+    // -----------------------------------------------------------------------
+    // 8.  Public support popup + request submission
+    // -----------------------------------------------------------------------
+
+    const $supportModal = $( '#noor-support-modal' );
+
+    function openSupportModal() {
+        if ( ! $supportModal.length ) return;
+        $( '#noor-support-source-url' ).val( window.location.href );
+        $supportModal.addClass( 'is-open' ).attr( 'aria-hidden', 'false' );
+        $( 'body' ).addClass( 'noor-modal-open' );
+        $( '#noor-support-name' ).trigger( 'focus' );
+    }
+
+    function closeSupportModal() {
+        if ( ! $supportModal.length ) return;
+        $supportModal.removeClass( 'is-open' ).attr( 'aria-hidden', 'true' );
+        $( 'body' ).removeClass( 'noor-modal-open' );
+    }
+
+    $( document ).on( 'click', '[data-noor-support-open]', function ( e ) {
+        e.preventDefault();
+        openSupportModal();
+    } );
+
+    $( document ).on( 'click', '[data-noor-support-close]', function () {
+        closeSupportModal();
+    } );
+
+    $( document ).on( 'click', '#noor-support-modal', function ( e ) {
+        if ( e.target === this ) {
+            closeSupportModal();
+        }
+    } );
+
+    $( document ).on( 'keydown', function ( e ) {
+        if ( e.key === 'Escape' ) {
+            closeSupportModal();
+        }
+    } );
+
+    $( document ).on( 'submit', '#noor-support-form', function ( e ) {
+        e.preventDefault();
+
+        const $form = $( this );
+        const $btn = $( '#noor-support-submit-btn' );
+        const $feedback = $( '#noor-support-feedback' );
+        const originalLabel = $btn.data( 'original-label' ) || $btn.text();
+
+        $btn.data( 'original-label', originalLabel );
+        $btn.prop( 'disabled', true ).text( noorTMS.i18n.sending || noorTMS.i18n.saving );
+        $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+        $.ajax( {
+            url: noorTMS.ajaxUrl,
+            method: 'POST',
+            data: $form.serialize() + '&action=noor_tms_submit_support_request&nonce=' + encodeURIComponent( noorTMS.nonce ),
+        } )
+        .done( function ( response ) {
+            if ( response.success ) {
+                const msg = response.data && response.data.message
+                    ? response.data.message
+                    : noorTMS.i18n.supportSent;
+                $feedback.addClass( 'is-success' ).text( msg );
+                $form.get( 0 ).reset();
+                $( '#noor-support-source-url' ).val( window.location.href );
+            } else {
+                const err = response.data && response.data.message
+                    ? response.data.message
+                    : noorTMS.i18n.error;
+                $feedback.addClass( 'is-error' ).text( err );
+            }
+        } )
+        .fail( function ( xhr ) {
+            const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                ? xhr.responseJSON.data.message
+                : noorTMS.i18n.error;
+            $feedback.addClass( 'is-error' ).text( msg );
+        } )
+        .always( function () {
+            $btn.prop( 'disabled', false ).text( originalLabel );
+        } );
+    } );
+
+    // -----------------------------------------------------------------------
+    // 9.  Floating chat widget
+    // -----------------------------------------------------------------------
+
+    const $chatWidget = $( '[data-noor-chat-widget]' );
+
+    if ( $chatWidget.length ) {
+        const chatConfig = noorTMS.chat || {};
+        const storageKey = chatConfig.storageKey || 'noor_tms_chat_state_v1';
+        const pollMs = Number( chatConfig.pollMs || 7000 );
+
+        const $chatPanel = $( '#noor-chat-panel' );
+        const $chatToggle = $( '[data-noor-chat-toggle]' );
+        const $chatIdentity = $( '[data-noor-chat-identity]' );
+        const $chatThread = $( '[data-noor-chat-thread]' );
+        const $chatMessages = $( '#noor-chat-messages' );
+        const $chatFeedback = $( '#noor-chat-feedback' );
+        const $chatBootstrapForm = $( '#noor-chat-bootstrap-form' );
+        const $chatSendForm = $( '#noor-chat-send-form' );
+        const $chatBootstrapBtn = $( '#noor-chat-bootstrap-btn' );
+        const $chatSendBtn = $( '#noor-chat-send-btn' );
+        const $chatMessageInput = $( '#noor-chat-message' );
+
+        const chatState = {
+            threadId: 0,
+            visitorToken: '',
+            lastMessageId: 0,
+            status: 'open',
+            pollTimer: null,
+            isFetching: false,
+            isBootstrapped: false,
+        };
+
+        setChatSourceUrl();
+
+        $( document ).on( 'click', '[data-noor-chat-open]', function ( e ) {
+            e.preventDefault();
+            openChatPanel();
+            if ( ! chatState.isBootstrapped ) {
+                bootstrapChatFromStorage();
+            }
+        } );
+
+        $chatToggle.on( 'click', function () {
+            if ( $chatPanel.prop( 'hidden' ) ) {
+                openChatPanel();
+                if ( ! chatState.isBootstrapped ) {
+                    bootstrapChatFromStorage();
+                }
+            } else {
+                closeChatPanel();
+            }
+        } );
+
+        $( document ).on( 'click', '[data-noor-chat-close]', function () {
+            closeChatPanel();
+        } );
+
+        $chatBootstrapForm.on( 'submit', function ( e ) {
+            e.preventDefault();
+
+            const name = String( $( '#noor-chat-name' ).val() || '' ).trim();
+            const email = String( $( '#noor-chat-email' ).val() || '' ).trim();
+            const phone = String( $( '#noor-chat-phone' ).val() || '' ).trim();
+
+            if ( ! name || ( ! email && ! phone ) ) {
+                setChatFeedback( noorTMS.i18n.chatNeedIdentity || noorTMS.i18n.error, true );
+                return;
+            }
+
+            bootstrapChat( {
+                chat_name: name,
+                chat_email: email,
+                chat_phone: phone,
+                chat_source_url: window.location.href,
+            } );
+        } );
+
+        $chatSendForm.on( 'submit', function ( e ) {
+            e.preventDefault();
+
+            const message = String( $chatMessageInput.val() || '' ).trim();
+            if ( ! message ) {
+                setChatFeedback( noorTMS.i18n.chatNeedMessage || noorTMS.i18n.error, true );
+                return;
+            }
+
+            if ( ! chatState.threadId ) {
+                setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                return;
+            }
+
+            sendChatMessage( message );
+        } );
+
+        $( document ).on( 'keydown', function ( e ) {
+            if ( e.key === 'Escape' && ! $chatPanel.prop( 'hidden' ) ) {
+                closeChatPanel();
+            }
+        } );
+
+        // Attempt restoring an existing chat thread in the background.
+        bootstrapChatFromStorage();
+
+        function openChatPanel() {
+            $chatPanel.prop( 'hidden', false );
+            $chatWidget.addClass( 'is-open' );
+            $chatToggle.attr( 'aria-expanded', 'true' );
+        }
+
+        function closeChatPanel() {
+            $chatPanel.prop( 'hidden', true );
+            $chatWidget.removeClass( 'is-open' );
+            $chatToggle.attr( 'aria-expanded', 'false' );
+        }
+
+        function setChatSourceUrl() {
+            $( '#noor-chat-source-url' ).val( window.location.href );
+        }
+
+        function readChatStorage() {
+            try {
+                const raw = window.localStorage.getItem( storageKey );
+                if ( ! raw ) return null;
+                const parsed = JSON.parse( raw );
+                if ( ! parsed || typeof parsed !== 'object' ) return null;
+                return parsed;
+            } catch ( err ) {
+                return null;
+            }
+        }
+
+        function writeChatStorage() {
+            try {
+                window.localStorage.setItem(
+                    storageKey,
+                    JSON.stringify( {
+                        threadId: chatState.threadId,
+                        visitorToken: chatState.visitorToken,
+                        lastMessageId: chatState.lastMessageId,
+                    } )
+                );
+            } catch ( err ) {
+                // Ignore storage write issues.
+            }
+        }
+
+        function clearChatStorage() {
+            try {
+                window.localStorage.removeItem( storageKey );
+            } catch ( err ) {
+                // Ignore storage errors.
+            }
+        }
+
+        function bootstrapChatFromStorage() {
+            const saved = readChatStorage();
+            if ( ! saved ) {
+                return;
+            }
+
+            if ( saved.threadId ) {
+                chatState.threadId = Number( saved.threadId ) || 0;
+            }
+            if ( saved.visitorToken ) {
+                chatState.visitorToken = String( saved.visitorToken );
+            }
+
+            if ( chatState.threadId && chatState.visitorToken ) {
+                bootstrapChat( {
+                    thread_id: chatState.threadId,
+                    visitor_token: chatState.visitorToken,
+                }, true );
+            }
+        }
+
+        function bootstrapChat( extraData, silent ) {
+            const payload = $.extend( {
+                action: 'noor_tms_chat_bootstrap',
+                nonce: noorTMS.nonce,
+                thread_id: chatState.threadId,
+                visitor_token: chatState.visitorToken,
+            }, extraData || {} );
+
+            if ( ! silent ) {
+                $chatBootstrapBtn.prop( 'disabled', true ).text( noorTMS.i18n.sending || noorTMS.i18n.chatStart );
+                setChatFeedback( '' );
+            }
+
+            $.ajax( {
+                url: noorTMS.ajaxUrl,
+                method: 'POST',
+                data: payload,
+            } )
+            .done( function ( response ) {
+                if ( ! response || ! response.success || ! response.data || ! response.data.thread ) {
+                    if ( ! silent ) {
+                        setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                    }
+                    return;
+                }
+
+                const thread = response.data.thread;
+                chatState.threadId = Number( thread.id || 0 );
+                chatState.visitorToken = String( thread.visitor_token || chatState.visitorToken || '' );
+                chatState.status = String( thread.status || 'open' );
+                chatState.isBootstrapped = chatState.threadId > 0;
+                chatState.lastMessageId = 0;
+
+                $chatMessages.empty();
+                appendChatMessages( response.data.messages || [] );
+                writeChatStorage();
+                applyChatStatus();
+
+                if ( chatState.isBootstrapped ) {
+                    $chatIdentity.prop( 'hidden', true );
+                    $chatThread.prop( 'hidden', false );
+                    setChatFeedback( noorTMS.i18n.chatConnected || '' );
+                    $chatMessageInput.trigger( 'focus' );
+                    startChatPolling();
+                }
+            } )
+            .fail( function () {
+                if ( ! silent ) {
+                    setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                }
+            } )
+            .always( function () {
+                if ( ! silent ) {
+                    $chatBootstrapBtn.prop( 'disabled', false ).text( noorTMS.i18n.chatStart || 'Start Chat' );
+                }
+            } );
+        }
+
+        function sendChatMessage( message ) {
+            $chatSendBtn.prop( 'disabled', true ).text( noorTMS.i18n.chatSending || noorTMS.i18n.sending );
+            setChatFeedback( '' );
+
+            $.ajax( {
+                url: noorTMS.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action: 'noor_tms_chat_send',
+                    nonce: noorTMS.nonce,
+                    thread_id: chatState.threadId,
+                    visitor_token: chatState.visitorToken,
+                    message: message,
+                },
+            } )
+            .done( function ( response ) {
+                if ( ! response || ! response.success || ! response.data ) {
+                    setChatFeedback( noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+                    return;
+                }
+
+                if ( response.data.message ) {
+                    appendChatMessages( [ response.data.message ] );
+                }
+
+                $chatMessageInput.val( '' );
+                fetchChatMessages();
+            } )
+            .fail( function ( xhr ) {
+                const serverMsg = xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : '';
+                setChatFeedback( serverMsg || noorTMS.i18n.chatTryAgain || noorTMS.i18n.error, true );
+            } )
+            .always( function () {
+                $chatSendBtn.prop( 'disabled', false ).text( noorTMS.i18n.send || 'Send' );
+            } );
+        }
+
+        function startChatPolling() {
+            if ( chatState.pollTimer ) {
+                window.clearInterval( chatState.pollTimer );
+            }
+
+            chatState.pollTimer = window.setInterval( function () {
+                fetchChatMessages();
+            }, Math.max( 3000, pollMs ) );
+        }
+
+        function fetchChatMessages() {
+            if ( ! chatState.threadId || chatState.isFetching ) {
+                return;
+            }
+
+            chatState.isFetching = true;
+
+            $.ajax( {
+                url: noorTMS.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action: 'noor_tms_chat_fetch',
+                    nonce: noorTMS.nonce,
+                    thread_id: chatState.threadId,
+                    visitor_token: chatState.visitorToken,
+                    after_id: chatState.lastMessageId,
+                },
+            } )
+            .done( function ( response ) {
+                if ( ! response || ! response.success || ! response.data ) {
+                    return;
+                }
+
+                if ( response.data.status ) {
+                    chatState.status = String( response.data.status );
+                    applyChatStatus();
+                }
+
+                appendChatMessages( response.data.messages || [] );
+            } )
+            .fail( function ( xhr ) {
+                if ( xhr && xhr.status === 404 ) {
+                    clearChatStorage();
+                }
+            } )
+            .always( function () {
+                chatState.isFetching = false;
+            } );
+        }
+
+        function appendChatMessages( messages ) {
+            if ( ! Array.isArray( messages ) || ! messages.length ) {
+                return;
+            }
+
+            let shouldScroll = false;
+
+            messages.forEach( function ( msg ) {
+                const id = Number( msg.id || 0 );
+                if ( ! id ) {
+                    return;
+                }
+
+                if ( $chatMessages.find( '[data-msg-id="' + id + '"]' ).length ) {
+                    if ( id > chatState.lastMessageId ) {
+                        chatState.lastMessageId = id;
+                    }
+                    return;
+                }
+
+                const role = String( msg.sender_role || 'visitor' );
+                const text = String( msg.message_text || '' );
+                const createdAt = String( msg.created_at || '' );
+
+                const cssRole = role === 'agent'
+                    ? 'is-agent'
+                    : ( role === 'system' ? 'is-system' : 'is-visitor' );
+
+                const roleLabel = role === 'agent'
+                    ? 'Agent'
+                    : ( role === 'system' ? 'System' : 'You' );
+
+                const safeText = escHtml( text ).replace( /\n/g, '<br>' );
+
+                const $bubble = $(
+                    '<div class="noor-chat-bubble ' + cssRole + '" data-msg-id="' + id + '">' +
+                        '<div class="noor-chat-bubble__meta">' + escHtml( roleLabel ) + formatChatTime( createdAt ) + '</div>' +
+                        '<div class="noor-chat-bubble__text">' + safeText + '</div>' +
+                    '</div>'
+                );
+
+                $chatMessages.append( $bubble );
+                if ( id > chatState.lastMessageId ) {
+                    chatState.lastMessageId = id;
+                }
+                shouldScroll = true;
+            } );
+
+            if ( shouldScroll ) {
+                writeChatStorage();
+                scrollChatToBottom();
+            }
+        }
+
+        function applyChatStatus() {
+            const isClosed = chatState.status === 'closed' || chatState.status === 'resolved';
+            $chatSendBtn.prop( 'disabled', isClosed );
+            $chatMessageInput.prop( 'disabled', isClosed );
+
+            if ( isClosed ) {
+                setChatFeedback( 'This chat has been marked as resolved. Start a new chat if needed.' );
+            }
+        }
+
+        function scrollChatToBottom() {
+            const node = $chatMessages.get( 0 );
+            if ( ! node ) {
+                return;
+            }
+            node.scrollTop = node.scrollHeight;
+        }
+
+        function formatChatTime( createdAt ) {
+            if ( ! createdAt ) {
+                return '';
+            }
+
+            const d = new Date( createdAt.replace( ' ', 'T' ) );
+            if ( Number.isNaN( d.getTime() ) ) {
+                return '';
+            }
+
+            const hh = String( d.getHours() ).padStart( 2, '0' );
+            const mm = String( d.getMinutes() ).padStart( 2, '0' );
+            return ' • ' + hh + ':' + mm;
+        }
+
+        function setChatFeedback( message, isError ) {
+            const text = String( message || '' );
+            $chatFeedback.text( text );
+            $chatFeedback.removeClass( 'is-error is-success' );
+
+            if ( ! text ) {
+                return;
+            }
+
+            $chatFeedback.addClass( isError ? 'is-error' : 'is-success' );
+        }
+    }
 
 } )( jQuery );

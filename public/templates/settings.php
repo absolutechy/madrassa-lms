@@ -89,6 +89,103 @@ if ( 'saved' === $msg ) {
 			</p>
 		</div>
 
+		<hr style="border:none;border-top:1px solid var(--tms-border);margin:20px 0 24px;" />
+		<h3 style="margin-top:0;"><?php esc_html_e( 'Public Homepage Content', 'noor-tms' ); ?></h3>
+
+		<div class="noor-form-group" style="max-width:560px;">
+			<label for="madrassa_name"><?php esc_html_e( 'Madrassa Name', 'noor-tms' ); ?></label>
+			<input type="text" id="madrassa_name" name="madrassa_name" value="<?php echo esc_attr( $opts['madrassa_name'] ?? '' ); ?>" />
+		</div>
+
+		<div class="noor-form-group" style="max-width:560px;">
+			<label for="madrassa_tagline"><?php esc_html_e( 'Tagline', 'noor-tms' ); ?></label>
+			<input type="text" id="madrassa_tagline" name="madrassa_tagline" value="<?php echo esc_attr( $opts['madrassa_tagline'] ?? '' ); ?>" />
+		</div>
+
+		<div class="noor-form-group" style="max-width:680px;">
+			<label for="madrassa_about"><?php esc_html_e( 'About Text', 'noor-tms' ); ?></label>
+			<textarea id="madrassa_about" name="madrassa_about" rows="4"><?php echo esc_textarea( $opts['madrassa_about'] ?? '' ); ?></textarea>
+		</div>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="cta_apply_label"><?php esc_html_e( 'CTA: Apply Label', 'noor-tms' ); ?></label>
+				<input type="text" id="cta_apply_label" name="cta_apply_label" value="<?php echo esc_attr( $opts['cta_apply_label'] ?? '' ); ?>" />
+			</div>
+			<div class="noor-form-group">
+				<label for="cta_apply_url"><?php esc_html_e( 'CTA: Apply URL', 'noor-tms' ); ?></label>
+				<input type="url" id="cta_apply_url" name="cta_apply_url" value="<?php echo esc_attr( $opts['cta_apply_url'] ?? '' ); ?>" placeholder="https://" />
+			</div>
+		</div>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="cta_classes_label"><?php esc_html_e( 'CTA: Classes Label', 'noor-tms' ); ?></label>
+				<input type="text" id="cta_classes_label" name="cta_classes_label" value="<?php echo esc_attr( $opts['cta_classes_label'] ?? '' ); ?>" />
+			</div>
+			<div class="noor-form-group">
+				<label for="cta_classes_url"><?php esc_html_e( 'CTA: Classes URL', 'noor-tms' ); ?></label>
+				<input type="url" id="cta_classes_url" name="cta_classes_url" value="<?php echo esc_attr( $opts['cta_classes_url'] ?? '' ); ?>" placeholder="https://" />
+			</div>
+		</div>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="cta_login_label"><?php esc_html_e( 'CTA: Login Label', 'noor-tms' ); ?></label>
+				<input type="text" id="cta_login_label" name="cta_login_label" value="<?php echo esc_attr( $opts['cta_login_label'] ?? '' ); ?>" />
+			</div>
+			<div class="noor-form-group">
+				<label for="cta_support_label"><?php esc_html_e( 'CTA: Support Label', 'noor-tms' ); ?></label>
+				<input type="text" id="cta_support_label" name="cta_support_label" value="<?php echo esc_attr( $opts['cta_support_label'] ?? '' ); ?>" />
+			</div>
+		</div>
+
+		<hr style="border:none;border-top:1px solid var(--tms-border);margin:6px 0 24px;" />
+		<h3 style="margin-top:0;"><?php esc_html_e( 'Support Routing', 'noor-tms' ); ?></h3>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="support_email"><?php esc_html_e( 'Support Email', 'noor-tms' ); ?></label>
+				<input type="email" id="support_email" name="support_email" value="<?php echo esc_attr( $opts['support_email'] ?? '' ); ?>" />
+			</div>
+			<div class="noor-form-group">
+				<label for="support_phone"><?php esc_html_e( 'Support Phone', 'noor-tms' ); ?></label>
+				<input type="text" id="support_phone" name="support_phone" value="<?php echo esc_attr( $opts['support_phone'] ?? '' ); ?>" />
+			</div>
+		</div>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="support_whatsapp"><?php esc_html_e( 'Support WhatsApp', 'noor-tms' ); ?></label>
+				<input type="text" id="support_whatsapp" name="support_whatsapp" value="<?php echo esc_attr( $opts['support_whatsapp'] ?? '' ); ?>" placeholder="+923001234567" />
+			</div>
+			<div class="noor-form-group">
+				<label for="support_success_message"><?php esc_html_e( 'Popup Success Message', 'noor-tms' ); ?></label>
+				<input type="text" id="support_success_message" name="support_success_message" value="<?php echo esc_attr( $opts['support_success_message'] ?? '' ); ?>" />
+			</div>
+		</div>
+
+		<hr style="border:none;border-top:1px solid var(--tms-border);margin:6px 0 24px;" />
+		<h3 style="margin-top:0;"><?php esc_html_e( 'AI Agent (OpenAI-ready)', 'noor-tms' ); ?></h3>
+
+		<div class="noor-form-group" style="max-width:800px;">
+			<label>
+				<input type="checkbox" name="openai_enabled" value="1" <?php checked( ! empty( $opts['openai_enabled'] ) ); ?> />
+				<?php esc_html_e( 'Store OpenAI configuration for future chat agent rollout.', 'noor-tms' ); ?>
+			</label>
+		</div>
+
+		<div class="noor-form-row" style="max-width:800px;">
+			<div class="noor-form-group">
+				<label for="openai_model"><?php esc_html_e( 'OpenAI Model', 'noor-tms' ); ?></label>
+				<input type="text" id="openai_model" name="openai_model" value="<?php echo esc_attr( $opts['openai_model'] ?? '' ); ?>" placeholder="gpt-4o-mini" />
+			</div>
+			<div class="noor-form-group">
+				<label for="openai_api_key"><?php esc_html_e( 'OpenAI API Key', 'noor-tms' ); ?></label>
+				<input type="password" id="openai_api_key" name="openai_api_key" value="<?php echo esc_attr( $opts['openai_api_key'] ?? '' ); ?>" autocomplete="new-password" />
+			</div>
+		</div>
+
 		<div class="noor-form-actions">
 			<button type="submit" class="noor-btn noor-btn--primary">
 				<?php esc_html_e( 'Save Settings', 'noor-tms' ); ?>
