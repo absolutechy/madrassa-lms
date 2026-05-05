@@ -125,9 +125,9 @@ class WhatsApp {
 	 *
 	 * @param string $phone
 	 * @param string $message
-	 * @return false
+	 * @return bool
 	 */
-	private static function send_via_click_to_chat( string $phone, string $message ): false {
+	private static function send_via_click_to_chat( string $phone, string $message ): bool {
 		return false; // Cannot send in background – admin must click the link.
 	}
 
