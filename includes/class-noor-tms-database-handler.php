@@ -34,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '6.0';
+	private const SCHEMA_VERSION = '7.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -144,20 +144,42 @@ class DatabaseHandler {
 		) {$charset_collate};";
 
 		// ----------------------------------------------------------------
-		// Student attendance  (one row per student per day)
+		// Student attendance  (one row per student per day per time slot)
 		// ----------------------------------------------------------------
 		$sql_student_att = "CREATE TABLE " . self::student_attendance_table() . " (
 			id         BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			student_id BIGINT(20) UNSIGNED NOT NULL,
 			class_id   BIGINT(20) UNSIGNED NOT NULL,
 			att_date   DATE                NOT NULL,
+			time_slot  VARCHAR(20)         NOT NULL DEFAULT 'morning',
 			status     VARCHAR(20)         NOT NULL DEFAULT 'present',
 			marked_by  BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 			created_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
-			UNIQUE KEY uniq_student_date (student_id, att_date),
-			KEY idx_class_date (class_id, att_date)
+			UNIQUE KEY uniq_student_date_slot (student_id, att_date, time_slot),
+			KEY idx_class_date (class_id, att_date),
+			KEY idx_att_date_slot (att_date, time_slot)
+		) {$charset_collate};";
+
+		// ----------------------------------------------------------------
+		// Attendance audit log  (tracks every manual correction)
+		// ----------------------------------------------------------------
+		$sql_audit_log = "CREATE TABLE " . self::audit_log_table() . " (
+			id            BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			attendance_id BIGINT(20) UNSIGNED NOT NULL,
+			student_id    BIGINT(20) UNSIGNED NOT NULL,
+			att_date      DATE                NOT NULL,
+			time_slot     VARCHAR(20)         NOT NULL DEFAULT 'morning',
+			old_status    VARCHAR(20)         NOT NULL,
+			new_status    VARCHAR(20)         NOT NULL,
+			reason        TEXT                NOT NULL,
+			changed_by    BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			changed_at    DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY idx_attendance_id (attendance_id),
+			KEY idx_student_date (student_id, att_date),
+			KEY idx_changed_at (changed_at)
 		) {$charset_collate};";
 
 		// ----------------------------------------------------------------
@@ -296,6 +318,7 @@ class DatabaseHandler {
 		dbDelta( $sql_support_requests );
 		dbDelta( $sql_chat_threads );
 		dbDelta( $sql_chat_messages );
+		dbDelta( $sql_audit_log );
 
 		$installed = get_option( self::SCHEMA_OPTION, '1.0' );
 
@@ -320,6 +343,39 @@ class DatabaseHandler {
 			}
 		}
 
+		// v6.x → v7.0: add time_slot to student_attendance; swap unique key; create audit log table.
+		if ( version_compare( $installed, '7.0', '<' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery
+			$att_cols = $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::student_attendance_table(), 0 );
+			if ( ! in_array( 'time_slot', $att_cols, true ) ) {
+				$wpdb->query(
+					"ALTER TABLE " . self::student_attendance_table() .
+					" ADD COLUMN time_slot VARCHAR(20) NOT NULL DEFAULT 'morning' AFTER att_date"
+				);
+			}
+			// Drop legacy unique key and replace with the slot-aware one.
+			$old_key = $wpdb->get_results(
+				"SHOW INDEX FROM " . self::student_attendance_table() . " WHERE Key_name = 'uniq_student_date'",
+				ARRAY_A
+			);
+			if ( ! empty( $old_key ) ) {
+				$wpdb->query( 'ALTER TABLE ' . self::student_attendance_table() . ' DROP KEY uniq_student_date' );
+			}
+			$new_key = $wpdb->get_results(
+				"SHOW INDEX FROM " . self::student_attendance_table() . " WHERE Key_name = 'uniq_student_date_slot'",
+				ARRAY_A
+			);
+			if ( empty( $new_key ) ) {
+				$wpdb->query(
+					'ALTER TABLE ' . self::student_attendance_table() .
+					' ADD UNIQUE KEY uniq_student_date_slot (student_id, att_date, time_slot)'
+				);
+			}
+			// Ensure the audit-log table exists (dbDelta above handles new installs; this covers upgrades).
+			dbDelta( $sql_audit_log );
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery
+		}
+
 		update_option( self::SCHEMA_OPTION, self::SCHEMA_VERSION );
 	}
 
@@ -332,6 +388,7 @@ class DatabaseHandler {
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::chat_messages_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::chat_threads_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::support_requests_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::audit_log_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::teacher_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::student_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::class_teachers_table() );
@@ -390,6 +447,36 @@ class DatabaseHandler {
 	public static function teacher_attendance_table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'mms_teacher_attendance';
+	}
+
+	public static function audit_log_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_attendance_audit_log';
+	}
+
+	/**
+	 * Returns the four daily attendance time slots (key → label).
+	 *
+	 * @return array<string, string>
+	 */
+	public static function get_time_slots(): array {
+		return [
+			'morning'   => __( 'Morning (9:00 AM)',   'noor-tms' ),
+			'afternoon' => __( 'Afternoon (1:00 PM)', 'noor-tms' ),
+			'evening'   => __( 'Evening (5:00 PM)',   'noor-tms' ),
+			'night'     => __( 'Night (10:00 PM)',    'noor-tms' ),
+		];
+	}
+
+	/**
+	 * Detect the current active time slot based on server time.
+	 */
+	public static function current_time_slot(): string {
+		$hour = (int) current_time( 'H' );
+		if ( $hour >= 21 ) return 'night';
+		if ( $hour >= 16 ) return 'evening';
+		if ( $hour >= 12 ) return 'afternoon';
+		return 'morning';
 	}
 
 	public static function fee_structure_table(): string {
@@ -2237,17 +2324,20 @@ class DatabaseHandler {
 		int    $class_id,
 		string $date,
 		string $status,
-		int    $marked_by
+		int    $marked_by,
+		string $time_slot = 'morning'
 	): bool {
 		global $wpdb;
-		$allowed = [ 'present', 'absent', 'late', 'excused' ];
-		$status  = in_array( $status, $allowed, true ) ? $status : 'present';
+		$allowed   = [ 'present', 'absent', 'late', 'excused' ];
+		$slots     = [ 'morning', 'afternoon', 'evening', 'night' ];
+		$status    = in_array( $status, $allowed, true ) ? $status : 'present';
+		$time_slot = in_array( $time_slot, $slots, true ) ? $time_slot : 'morning';
 
-		// Try UPDATE first, then INSERT.
-		$existing = $wpdb->get_var(
+		$existing = $wpdb->get_var( // phpcs:ignore
 			$wpdb->prepare(
-				'SELECT id FROM ' . self::student_attendance_table() . ' WHERE student_id = %d AND att_date = %s',
-				$student_id, $date
+				'SELECT id FROM ' . self::student_attendance_table() .
+				' WHERE student_id = %d AND att_date = %s AND time_slot = %s',
+				$student_id, $date, $time_slot
 			)
 		);
 
@@ -2266,21 +2356,25 @@ class DatabaseHandler {
 					'student_id' => $student_id,
 					'class_id'   => $class_id,
 					'att_date'   => $date,
+					'time_slot'  => $time_slot,
 					'status'     => $status,
 					'marked_by'  => $marked_by,
 				],
-				[ '%d', '%d', '%s', '%s', '%d' ]
+				[ '%d', '%d', '%s', '%s', '%s', '%d' ]
 			);
 		}
 		return $r !== false;
 	}
 
 	/**
-	 * Bulk-save attendance records for all students in a class on a given date.
+	 * Bulk-save attendance records for a date and time slot.
 	 *
-	 * @param int    $class_id
+	 * When $class_id is 0 each record must include its own class_id (global marking mode).
+	 *
+	 * @param int    $class_id   Pass 0 to let per-record class_id be used.
 	 * @param string $date
-	 * @param array  $records   [ student_id => status, ... ]
+	 * @param string $time_slot
+	 * @param array  $records    Each: [ student_id, class_id (optional), status ]
 	 * @param int    $marked_by
 	 * @return int  Number of records saved.
 	 */
@@ -2288,13 +2382,16 @@ class DatabaseHandler {
 		int    $class_id,
 		string $date,
 		array  $records,
-		int    $marked_by
+		int    $marked_by,
+		string $time_slot = 'morning'
 	): int {
 		$saved = 0;
 		foreach ( $records as $rec ) {
-			$student_id = (int)    ( $rec['student_id'] ?? 0 );
-			$status     = (string) ( $rec['status']     ?? 'present' );
-			if ( $student_id && self::upsert_student_attendance( $student_id, $class_id, $date, $status, $marked_by ) ) {
+			$student_id  = (int)    ( $rec['student_id'] ?? 0 );
+			$status      = (string) ( $rec['status']     ?? 'present' );
+			$rec_class   = $class_id ?: (int) ( $rec['class_id'] ?? 0 );
+			if ( $student_id && $rec_class &&
+				self::upsert_student_attendance( $student_id, $rec_class, $date, $status, $marked_by, $time_slot ) ) {
 				$saved++;
 			}
 		}
@@ -2302,28 +2399,248 @@ class DatabaseHandler {
 	}
 
 	/**
-	 * Get attendance records for a class on a specific date.
+	 * Get attendance records for a class on a specific date and time slot.
 	 *
 	 * Returns array keyed by student_id → status.
 	 *
-	 * @param int    $class_id
-	 * @param string $date  Y-m-d
+	 * @param int    $class_id  Pass 0 to query all classes.
+	 * @param string $date      Y-m-d
+	 * @param string $time_slot
 	 * @return array<int, string>
 	 */
-	public static function get_student_attendance_for_date( int $class_id, string $date ): array {
+	public static function get_student_attendance_for_date( int $class_id, string $date, string $time_slot = 'morning' ): array {
 		global $wpdb;
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT student_id, status FROM ' . self::student_attendance_table() . ' WHERE class_id = %d AND att_date = %s',
-				$class_id, $date
-			),
-			ARRAY_A
-		);
+		if ( $class_id ) {
+			$rows = $wpdb->get_results( // phpcs:ignore
+				$wpdb->prepare(
+					'SELECT student_id, status FROM ' . self::student_attendance_table() .
+					' WHERE class_id = %d AND att_date = %s AND time_slot = %s',
+					$class_id, $date, $time_slot
+				),
+				ARRAY_A
+			);
+		} else {
+			$rows = $wpdb->get_results( // phpcs:ignore
+				$wpdb->prepare(
+					'SELECT student_id, status FROM ' . self::student_attendance_table() .
+					' WHERE att_date = %s AND time_slot = %s',
+					$date, $time_slot
+				),
+				ARRAY_A
+			);
+		}
 		$map = [];
 		foreach ( $rows ?: [] as $row ) {
 			$map[ (int) $row['student_id'] ] = $row['status'];
 		}
 		return $map;
+	}
+
+	/**
+	 * Return all active students joined with their class, ordered by class then name.
+	 * Used for global (cross-class) attendance marking.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_all_active_students(): array {
+		global $wpdb;
+		return $wpdb->get_results( // phpcs:ignore
+			"SELECT s.id, s.name, s.class_id, c.name AS class_name
+			   FROM " . self::students_table() . " s
+			   LEFT JOIN " . self::classes_table() . " c ON c.id = s.class_id
+			  WHERE s.status = 'active'
+			  ORDER BY c.name ASC, s.name ASC",
+			ARRAY_A
+		) ?: [];
+	}
+
+	/**
+	 * Paginated, filterable global attendance history.
+	 *
+	 * @param array $filters  Keys: date_from, date_to, time_slot, status, class_id, student_search
+	 * @param int   $page
+	 * @param int   $per_page
+	 * @return array { rows: array, total: int, pages: int }
+	 */
+	public static function get_global_attendance_history( array $filters = [], int $page = 1, int $per_page = 25 ): array {
+		global $wpdb;
+
+		$where  = [ '1=1' ];
+		$values = [];
+
+		if ( ! empty( $filters['date_from'] ) ) {
+			$where[]  = 'a.att_date >= %s';
+			$values[] = sanitize_text_field( $filters['date_from'] );
+		}
+		if ( ! empty( $filters['date_to'] ) ) {
+			$where[]  = 'a.att_date <= %s';
+			$values[] = sanitize_text_field( $filters['date_to'] );
+		}
+		if ( ! empty( $filters['time_slot'] ) ) {
+			$where[]  = 'a.time_slot = %s';
+			$values[] = sanitize_key( $filters['time_slot'] );
+		}
+		if ( ! empty( $filters['status'] ) ) {
+			$where[]  = 'a.status = %s';
+			$values[] = sanitize_key( $filters['status'] );
+		}
+		if ( ! empty( $filters['class_id'] ) ) {
+			$where[]  = 'a.class_id = %d';
+			$values[] = (int) $filters['class_id'];
+		}
+		if ( ! empty( $filters['student_search'] ) ) {
+			$where[]  = 'st.name LIKE %s';
+			$values[] = '%' . $wpdb->esc_like( sanitize_text_field( $filters['student_search'] ) ) . '%';
+		}
+
+		$where_sql = implode( ' AND ', $where );
+		$offset    = ( max( 1, $page ) - 1 ) * $per_page;
+
+		$count_sql = "SELECT COUNT(*) FROM " . self::student_attendance_table() . " a
+			JOIN " . self::students_table() . " st ON st.id = a.student_id
+			LEFT JOIN " . self::classes_table() . " c ON c.id = a.class_id
+			WHERE {$where_sql}";
+
+		$rows_sql = "SELECT a.id, a.student_id, st.name AS student_name,
+				c.name AS class_name, a.att_date, a.time_slot, a.status,
+				a.marked_by, a.updated_at,
+				u.display_name AS marked_by_name
+			FROM " . self::student_attendance_table() . " a
+			JOIN " . self::students_table() . " st ON st.id = a.student_id
+			LEFT JOIN " . self::classes_table() . " c ON c.id = a.class_id
+			LEFT JOIN {$wpdb->users} u ON u.ID = a.marked_by
+			WHERE {$where_sql}
+			ORDER BY a.att_date DESC, a.time_slot ASC, st.name ASC
+			LIMIT %d OFFSET %d";
+
+		if ( ! empty( $values ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+			$total = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
+			$rows  = $wpdb->get_results(
+				$wpdb->prepare( $rows_sql, array_merge( $values, [ $per_page, $offset ] ) ),
+				ARRAY_A
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			$total = (int) $wpdb->get_var( $count_sql ); // phpcs:ignore
+			$rows  = $wpdb->get_results( // phpcs:ignore
+				$wpdb->prepare( $rows_sql, [ $per_page, $offset ] ),
+				ARRAY_A
+			);
+		}
+
+		return [
+			'rows'  => $rows ?: [],
+			'total' => $total,
+			'pages' => $per_page > 0 ? (int) ceil( $total / $per_page ) : 1,
+		];
+	}
+
+	/**
+	 * Update a historical attendance record and write an audit log entry.
+	 *
+	 * @param int    $id         Attendance row ID.
+	 * @param string $new_status present|absent|late|excused
+	 * @param string $reason     Mandatory reason for the change.
+	 * @param int    $changed_by WP user ID of the editor.
+	 * @return bool
+	 */
+	public static function correct_attendance( int $id, string $new_status, string $reason, int $changed_by ): bool {
+		global $wpdb;
+
+		$allowed    = [ 'present', 'absent', 'late', 'excused' ];
+		$new_status = in_array( $new_status, $allowed, true ) ? $new_status : 'present';
+
+		$row = $wpdb->get_row( // phpcs:ignore
+			$wpdb->prepare( 'SELECT * FROM ' . self::student_attendance_table() . ' WHERE id = %d', $id ),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return false;
+		}
+
+		$old_status = $row['status'];
+
+		$updated = $wpdb->update(
+			self::student_attendance_table(),
+			[ 'status' => $new_status, 'marked_by' => $changed_by ],
+			[ 'id'     => $id ],
+			[ '%s', '%d' ],
+			[ '%d' ]
+		);
+
+		if ( false === $updated ) {
+			return false;
+		}
+
+		$wpdb->insert(
+			self::audit_log_table(),
+			[
+				'attendance_id' => $id,
+				'student_id'    => (int) $row['student_id'],
+				'att_date'      => $row['att_date'],
+				'time_slot'     => $row['time_slot'] ?? 'morning',
+				'old_status'    => $old_status,
+				'new_status'    => $new_status,
+				'reason'        => sanitize_textarea_field( $reason ),
+				'changed_by'    => $changed_by,
+			],
+			[ '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d' ]
+		);
+
+		return true;
+	}
+
+	/**
+	 * Get audit log entries (most recent first).
+	 *
+	 * @param array $filters  Keys: student_search, date_from, date_to, limit
+	 * @return array
+	 */
+	public static function get_attendance_audit_log( array $filters = [] ): array {
+		global $wpdb;
+
+		$where  = [ '1=1' ];
+		$values = [];
+
+		if ( ! empty( $filters['student_search'] ) ) {
+			$where[]  = 'st.name LIKE %s';
+			$values[] = '%' . $wpdb->esc_like( sanitize_text_field( $filters['student_search'] ) ) . '%';
+		}
+		if ( ! empty( $filters['date_from'] ) ) {
+			$where[]  = 'al.att_date >= %s';
+			$values[] = sanitize_text_field( $filters['date_from'] );
+		}
+		if ( ! empty( $filters['date_to'] ) ) {
+			$where[]  = 'al.att_date <= %s';
+			$values[] = sanitize_text_field( $filters['date_to'] );
+		}
+
+		$limit     = (int) ( $filters['limit'] ?? 100 );
+		$where_sql = implode( ' AND ', $where );
+
+		$sql = "SELECT al.*, st.name AS student_name,
+				c.name AS class_name,
+				u.display_name AS changed_by_name
+			FROM " . self::audit_log_table() . " al
+			JOIN " . self::students_table() . " st ON st.id = al.student_id
+			LEFT JOIN " . self::student_attendance_table() . " a ON a.id = al.attendance_id
+			LEFT JOIN " . self::classes_table() . " c ON c.id = a.class_id
+			LEFT JOIN {$wpdb->users} u ON u.ID = al.changed_by
+			WHERE {$where_sql}
+			ORDER BY al.changed_at DESC
+			LIMIT %d";
+
+		if ( ! empty( $values ) ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+			return $wpdb->get_results(
+				$wpdb->prepare( $sql, array_merge( $values, [ $limit ] ) ),
+				ARRAY_A
+			) ?: [];
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		}
+		return $wpdb->get_results( $wpdb->prepare( $sql, [ $limit ] ), ARRAY_A ) ?: []; // phpcs:ignore
 	}
 
 	/**

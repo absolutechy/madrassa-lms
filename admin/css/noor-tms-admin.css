@@ -796,3 +796,163 @@ span.required {
         max-width: 95%;
     }
 }
+/* ==========================================================================
+   Attendance – Time Slot Bar
+   ========================================================================== */
+.noor-slot-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.noor-slot-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 500;
+    background: #f0f0f0;
+    color: #555;
+    border: 1px solid #ddd;
+}
+
+.noor-slot-chip.is-current {
+    background: #e6f4ea;
+    border-color: #34a853;
+    color: #1e7e34;
+}
+
+.noor-slot-chip.is-selected {
+    background: #1d2327;
+    border-color: #1d2327;
+    color: #fff;
+}
+
+.noor-slot-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #34a853;
+    display: inline-block;
+}
+
+/* Slot badges in table */
+.noor-slot-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.noor-slot-morning   { background: #fff8e1; color: #e65100; }
+.noor-slot-afternoon { background: #e8f5e9; color: #2e7d32; }
+.noor-slot-evening   { background: #e3f2fd; color: #1565c0; }
+.noor-slot-night     { background: #ede7f6; color: #4527a0; }
+
+/* Extended badge variants */
+.noor-badge--late    { background: #fff3cd; color: #856404; }
+.noor-badge--excused { background: #f0f0f0; color: #555; }
+
+/* Att controls layout */
+.noor-att-controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+
+.noor-att-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Quick mark bar */
+.noor-quick-mark-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Attendance summary line */
+.noor-att-summary {
+    color: #555;
+    font-size: .85rem;
+    margin: 0 0 10px;
+}
+
+/* Row colouring */
+.noor-att-row.noor-att-absent  td { background-color: #fff5f5; }
+.noor-att-row.noor-att-late    td { background-color: #fffbec; }
+.noor-att-row.noor-att-excused td { background-color: #f8f8f8; }
+
+/* ==========================================================================
+   Correction Modal
+   ========================================================================== */
+.noor-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.noor-modal-overlay[hidden] { display: none; }
+
+.noor-modal-box {
+    background: #fff;
+    border-radius: 6px;
+    width: 90%;
+    max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.22);
+    overflow: hidden;
+}
+
+.noor-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #ddd;
+    background: #f6f7f7;
+}
+
+.noor-modal-header h3 { margin: 0; font-size: 1rem; }
+
+.noor-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.noor-modal-body {
+    padding: 18px 20px;
+}
+
+.noor-modal-body p { margin: 0 0 8px; }
+
+.noor-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #ddd;
+    background: #f6f7f7;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.noor-ajax-feedback.is-success { color: #25a05c; font-weight: 600; }
+.noor-ajax-feedback.is-error   { color: #dc3545; font-weight: 600; }

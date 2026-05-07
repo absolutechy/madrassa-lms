@@ -89,6 +89,7 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_noor_tms_delete_teacher',            $admin, 'ajax_delete_teacher' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_student_attendance',   $admin, 'ajax_save_student_attendance' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_save_teacher_attendance',   $admin, 'ajax_save_teacher_attendance' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_correct_attendance',         $admin, 'ajax_correct_attendance' );
 		$this->loader->add_action( 'admin_post_noor_tms_print_student',          $admin, 'handle_print_student' );
 
 		// Admin live-chat AJAX (logged-in only — no nopriv variants).
@@ -161,7 +162,7 @@ final class Plugin {
 	 */
 	public function maybe_upgrade_database(): void {
 		$installed = (string) get_option( 'noor_tms_db_version', '1.0' );
-		if ( version_compare( $installed, '6.0', '<' ) ) {
+		if ( version_compare( $installed, '7.0', '<' ) ) {
 			DatabaseHandler::create_tables();
 		}
 	}

@@ -413,21 +413,57 @@ class PublicController {
 			$classes   = array_values( array_filter( $all, fn( $c ) => in_array( (int) $c['id'], $class_ids, true ) ) );
 		}
 
-		$tab      = sanitize_key( $_GET['tab']       ?? 'mark' );
-		$class_id = (int) ( $_GET['class_id']        ?? ( $classes[0]['id'] ?? 0 ) );
-		$att_date = sanitize_text_field( $_GET['att_date'] ?? current_time( 'Y-m-d' ) );
-		$month    = (int) ( $_GET['att_month']       ?? (int) current_time( 'n' ) );
-		$year     = (int) ( $_GET['att_year']        ?? (int) current_time( 'Y' ) );
+		$tab          = sanitize_key( $_GET['tab']       ?? 'mark' );
+		$class_id     = (int) ( $_GET['class_id']        ?? 0 );
+		$att_date     = sanitize_text_field( $_GET['att_date'] ?? current_time( 'Y-m-d' ) );
+		$current_slot = DatabaseHandler::current_time_slot();
+		$time_slot    = sanitize_key( $_GET['time_slot'] ?? $current_slot );
+		$valid_slots  = array_keys( DatabaseHandler::get_time_slots() );
+		if ( ! in_array( $time_slot, $valid_slots, true ) ) {
+			$time_slot = $current_slot;
+		}
+		$mode    = $is_manager ? sanitize_key( $_GET['mode'] ?? 'class' ) : 'class';
+		$month   = (int) ( $_GET['att_month'] ?? (int) current_time( 'n' ) );
+		$year    = (int) ( $_GET['att_year']  ?? (int) current_time( 'Y' ) );
+		$paged   = max( 1, (int) ( $_GET['att_paged'] ?? 1 ) );
+		$per_page = (int) ( $_GET['per_page'] ?? 25 );
+		$per_page = in_array( $per_page, [ 20, 25, 50 ], true ) ? $per_page : 25;
 
-		$students = [];
-		$marked   = [];
-		$summary  = [];
+		// History filters.
+		$f_date_from = sanitize_text_field( $_GET['f_date_from'] ?? '' );
+		$f_date_to   = sanitize_text_field( $_GET['f_date_to']   ?? '' );
+		$f_slot      = sanitize_key( $_GET['f_slot']             ?? '' );
+		$f_status    = sanitize_key( $_GET['f_status']           ?? '' );
+		$f_class_id  = (int) ( $_GET['f_class_id']              ?? 0 );
+		$f_search    = sanitize_text_field( $_GET['f_search']    ?? '' );
 
-		if ( 'mark' === $tab && $class_id ) {
-			$students = DatabaseHandler::get_students_by_class( $class_id );
-			$marked   = DatabaseHandler::get_student_attendance_for_date( $class_id, $att_date );
+		$students       = [];
+		$marked         = [];
+		$history_result = [ 'rows' => [], 'total' => 0, 'pages' => 1 ];
+		$audit_entries  = [];
+
+		if ( 'mark' === $tab ) {
+			if ( 'global' === $mode && $is_manager ) {
+				$students = DatabaseHandler::get_all_active_students();
+				$marked   = DatabaseHandler::get_student_attendance_for_date( 0, $att_date, $time_slot );
+			} elseif ( $class_id ) {
+				$students = DatabaseHandler::get_students_by_class( $class_id );
+				$marked   = DatabaseHandler::get_student_attendance_for_date( $class_id, $att_date, $time_slot );
+			}
 		} elseif ( 'history' === $tab ) {
-			$summary = DatabaseHandler::get_student_attendance_summary( $month, $year, $class_id ?: null );
+			$filters = [
+				'date_from'      => $f_date_from,
+				'date_to'        => $f_date_to,
+				'time_slot'      => $f_slot,
+				'status'         => $f_status,
+				'class_id'       => $f_class_id,
+				'student_search' => $f_search,
+			];
+			$history_result = DatabaseHandler::get_global_attendance_history( $filters, $paged, $per_page );
+		} elseif ( 'audit_log' === $tab && $is_manager ) {
+			$audit_entries = DatabaseHandler::get_attendance_audit_log( [
+				'limit' => 100,
+			] );
 		}
 
 		ob_start();

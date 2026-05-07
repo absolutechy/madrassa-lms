@@ -317,14 +317,27 @@
     // 9.  Student & Teacher Attendance (admin pages)
     // -----------------------------------------------------------------------
 
+    // Toggle class selector visibility based on mode (global vs. class).
+    $( document ).on( 'change', '#noor-att-mode', function () {
+        const isGlobal = $( this ).val() === 'global';
+        $( '#noor-class-label' ).toggle( ! isGlobal );
+    } );
+
     // Quick mark – set all status selects on the page to a given status.
     $( document ).on( 'click', '.noor-mark-all', function () {
         const status = $( this ).data( 'status' );
-        $( '.noor-att-status' ).val( status );
+        $( '.noor-att-status' ).val( status ).trigger( 'change' );
+    } );
+
+    // Row colour update on status change.
+    $( document ).on( 'change', '.noor-att-status', function () {
+        const $row = $( this ).closest( 'tr' );
+        $row.removeClass( 'noor-att-present noor-att-absent noor-att-late noor-att-excused' );
+        $row.addClass( 'noor-att-' + $( this ).val() );
     } );
 
     // Save student attendance.
-    $( '#noor-student-att-form' ).on( 'submit', function ( e ) {
+    $( document ).on( 'submit', '#noor-student-att-form', function ( e ) {
         e.preventDefault();
 
         const $form     = $( this );
@@ -334,7 +347,7 @@
         $btn.prop( 'disabled', true ).text( noorTMS.i18n.saving );
         $feedback.text( '' ).removeClass( 'is-error is-success' );
 
-        $.post( noorTMS.ajaxUrl, $form.serialize() + '&action=noor_tms_save_student_attendance' )
+        $.post( noorTMS.ajaxUrl, $form.serialize() + '&action=noor_tms_save_student_attendance&nonce=' + encodeURIComponent( noorTMS.nonce ) )
         .done( function ( r ) {
             if ( r.success ) {
                 $feedback.addClass( 'is-success' ).text( r.data.message );
@@ -351,7 +364,7 @@
     } );
 
     // Save teacher attendance.
-    $( '#noor-teacher-att-form' ).on( 'submit', function ( e ) {
+    $( document ).on( 'submit', '#noor-teacher-att-form', function ( e ) {
         e.preventDefault();
 
         const $form     = $( this );
@@ -374,6 +387,94 @@
         } )
         .always( function () {
             $btn.prop( 'disabled', false ).text( 'Save Attendance' );
+        } );
+    } );
+
+    // -----------------------------------------------------------------------
+    // 10.  Attendance Correction Modal (admin history tab)
+    // -----------------------------------------------------------------------
+
+    const $corrModal   = $( '#noor-correction-modal' );
+    const $modalSubmit = $( '#noor-modal-submit' );
+
+    // Open modal when "Correct" button clicked.
+    $( document ).on( 'click', '.noor-open-correction', function () {
+        const $btn  = $( this );
+        $( '#noor-modal-att-id' ).val( $btn.data( 'id' ) );
+        $( '#noor-modal-student' ).text( $btn.data( 'student' ) );
+        $( '#noor-modal-date-slot' ).text( $btn.data( 'date' ) + ' — ' + $btn.data( 'slot' ) );
+        $( '#noor-modal-current-status' ).text( $btn.data( 'status' ) );
+        $( '#noor-modal-new-status' ).val( $btn.data( 'status' ) );
+        $( '#noor-modal-reason' ).val( '' );
+        $( '#noor-modal-feedback' ).text( '' ).removeClass( 'is-error is-success' );
+        $corrModal.prop( 'hidden', false );
+        $( '#noor-modal-new-status' ).trigger( 'focus' );
+    } );
+
+    // Close modal.
+    $( document ).on( 'click', '.noor-modal-close', closeModal );
+    $( document ).on( 'click', '#noor-correction-modal', function ( e ) {
+        if ( e.target === this ) { closeModal(); }
+    } );
+    $( document ).on( 'keydown', function ( e ) {
+        if ( e.key === 'Escape' ) { closeModal(); }
+    } );
+
+    function closeModal() {
+        $corrModal.prop( 'hidden', true );
+    }
+
+    // Submit correction.
+    $( document ).on( 'click', '#noor-modal-submit', function () {
+        const attId     = $( '#noor-modal-att-id' ).val();
+        const newStatus = $( '#noor-modal-new-status' ).val();
+        const reason    = $( '#noor-modal-reason' ).val().trim();
+        const $feedback = $( '#noor-modal-feedback' );
+
+        if ( ! reason ) {
+            $feedback.addClass( 'is-error' ).text( 'A reason is required.' );
+            $( '#noor-modal-reason' ).trigger( 'focus' );
+            return;
+        }
+
+        $modalSubmit.prop( 'disabled', true ).text( noorTMS.i18n.saving );
+        $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:     'noor_tms_correct_attendance',
+            nonce:      noorTMS.nonce,
+            att_id:     attId,
+            new_status: newStatus,
+            reason:     reason,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $feedback.addClass( 'is-success' ).text( r.data.message );
+                // Update the row badge in the history table.
+                const $row    = $( '#noor-att-row-' + attId );
+                const $badge  = $row.find( '.noor-badge' );
+                const labels  = { present: 'Present', absent: 'Absent', late: 'Late', excused: 'Excused' };
+                const classes = {
+                    present: 'noor-badge--active',
+                    absent:  'noor-badge--inactive',
+                    late:    'noor-badge--late',
+                    excused: 'noor-badge--excused',
+                };
+                $badge.removeClass( 'noor-badge--active noor-badge--inactive noor-badge--late noor-badge--excused' )
+                      .addClass( classes[ newStatus ] || '' )
+                      .text( labels[ newStatus ] || newStatus );
+                // Update the "Correct" button's data-status.
+                $row.find( '.noor-open-correction' ).data( 'status', newStatus );
+                setTimeout( closeModal, 1400 );
+            } else {
+                $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+            }
+        } )
+        .fail( function () {
+            $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+        } )
+        .always( function () {
+            $modalSubmit.prop( 'disabled', false ).text( 'Save Correction' );
         } );
     } );
 

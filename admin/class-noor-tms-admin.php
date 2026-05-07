@@ -267,6 +267,10 @@ class Admin {
 		$this->teachers->ajax_save_teacher_attendance();
 	}
 
+	public function ajax_correct_attendance(): void {
+		$this->attendance->ajax_correct_attendance();
+	}
+
 	// -----------------------------------------------------------------------
 	// Admin live-chat AJAX handlers
 	// -----------------------------------------------------------------------

@@ -259,10 +259,15 @@
     // 8.  Attendance – mark attendance (public portal)
     // -----------------------------------------------------------------------
 
+    // Toggle class selector visibility when mode changes.
+    $( document ).on( 'change', '#noor-att-mode', function () {
+        $( '#noor-class-label' ).toggle( $( this ).val() !== 'global' );
+    } );
+
     // Quick mark – set all selects to a given status.
     $( document ).on( 'click', '.noor-mark-all', function () {
         const status = $( this ).data( 'status' );
-        $( '.noor-att-status' ).val( status );
+        $( '.noor-att-status' ).val( status ).trigger( 'change' );
     } );
 
     // Highlight row colour when status changes.
@@ -302,6 +307,91 @@
             $btn.prop( 'disabled', false );
         } );
     } );
+
+    // -----------------------------------------------------------------------
+    // 8b.  Attendance Correction Modal (public portal, managers only)
+    // -----------------------------------------------------------------------
+
+    const $pubCorrModal   = $( '#noor-correction-modal' );
+    const $pubModalSubmit = $( '#noor-modal-submit' );
+
+    if ( $pubCorrModal.length ) {
+        // Open correction modal.
+        $( document ).on( 'click', '.noor-open-correction', function () {
+            const $btn = $( this );
+            $( '#noor-modal-att-id' ).val( $btn.data( 'id' ) );
+            $( '#noor-modal-student' ).text( $btn.data( 'student' ) );
+            $( '#noor-modal-date-slot' ).text( $btn.data( 'date' ) + ' — ' + $btn.data( 'slot' ) );
+            $( '#noor-modal-current-status' ).text( $btn.data( 'status' ) );
+            $( '#noor-modal-new-status' ).val( $btn.data( 'status' ) );
+            $( '#noor-modal-reason' ).val( '' );
+            $( '#noor-modal-feedback' ).text( '' ).removeClass( 'is-error is-success' );
+            $pubCorrModal.prop( 'hidden', false );
+            $( '#noor-modal-new-status' ).trigger( 'focus' );
+        } );
+
+        // Close modal.
+        $( document ).on( 'click', '.noor-modal-close', closePubModal );
+        $( document ).on( 'click', '#noor-correction-modal', function ( e ) {
+            if ( e.target === this ) { closePubModal(); }
+        } );
+
+        function closePubModal() {
+            $pubCorrModal.prop( 'hidden', true );
+        }
+
+        // Submit correction.
+        $( document ).on( 'click', '#noor-modal-submit', function () {
+            const attId     = $( '#noor-modal-att-id' ).val();
+            const newStatus = $( '#noor-modal-new-status' ).val();
+            const reason    = $( '#noor-modal-reason' ).val().trim();
+            const $feedback = $( '#noor-modal-feedback' );
+
+            if ( ! reason ) {
+                $feedback.addClass( 'is-error' ).text( 'A reason is required.' );
+                $( '#noor-modal-reason' ).trigger( 'focus' );
+                return;
+            }
+
+            $pubModalSubmit.prop( 'disabled', true ).text( noorTMS.i18n.saving );
+            $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+            $.post( noorTMS.ajaxUrl, {
+                action:     'noor_tms_correct_attendance',
+                nonce:      noorTMS.nonce,
+                att_id:     attId,
+                new_status: newStatus,
+                reason:     reason,
+            } )
+            .done( function ( r ) {
+                if ( r.success ) {
+                    $feedback.addClass( 'is-success' ).text( r.data.message );
+                    const $row   = $( '#noor-att-row-' + attId );
+                    const $badge = $row.find( '.noor-badge' );
+                    const labels  = { present: 'Present', absent: 'Absent', late: 'Late', excused: 'Excused' };
+                    const classes = {
+                        present: 'noor-badge--active',
+                        absent:  'noor-badge--inactive',
+                        late:    'noor-badge--late',
+                        excused: 'noor-badge--excused',
+                    };
+                    $badge.removeClass( 'noor-badge--active noor-badge--inactive noor-badge--late noor-badge--excused' )
+                          .addClass( classes[ newStatus ] || '' )
+                          .text( labels[ newStatus ] || newStatus );
+                    $row.find( '.noor-open-correction' ).data( 'status', newStatus );
+                    setTimeout( closePubModal, 1400 );
+                } else {
+                    $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+                }
+            } )
+            .fail( function () {
+                $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+            } )
+            .always( function () {
+                $pubModalSubmit.prop( 'disabled', false ).text( 'Save Correction' );
+            } );
+        } );
+    }
 
     // -----------------------------------------------------------------------
     // 8.  Public support popup + request submission

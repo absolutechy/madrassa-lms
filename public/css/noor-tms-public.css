@@ -1687,3 +1687,163 @@ body.noor-modal-open {
 		grid-template-columns: 1fr;
 	}
 }
+/* ==========================================================================
+   Attendance – Time Slot Bar (public portal)
+   ========================================================================== */
+.noor-slot-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.noor-slot-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 13px;
+    border-radius: 20px;
+    font-size: .77rem;
+    font-weight: 600;
+    background: var(--tms-surface, #f0f4f9);
+    color: var(--tms-muted, #64748b);
+    border: 1px solid var(--tms-border, #dde3ed);
+}
+
+.noor-slot-chip.is-current {
+    background: #e6f4ea;
+    border-color: var(--tms-accent, #25a05c);
+    color: var(--tms-accent, #25a05c);
+}
+
+.noor-slot-chip.is-selected {
+    background: var(--tms-primary, #1e3a5f);
+    border-color: var(--tms-primary, #1e3a5f);
+    color: #fff;
+}
+
+.noor-slot-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tms-accent, #25a05c);
+    display: inline-block;
+}
+
+/* Slot badges */
+.noor-slot-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.noor-slot-morning   { background: #fff8e1; color: #e65100; }
+.noor-slot-afternoon { background: #e8f5e9; color: #2e7d32; }
+.noor-slot-evening   { background: #e3f2fd; color: #1565c0; }
+.noor-slot-night     { background: #ede7f6; color: #4527a0; }
+
+/* Extended status badges */
+.noor-badge--late    { background: #fff3cd; color: #856404; }
+.noor-badge--excused { background: #f0f0f0; color: #555;    }
+
+/* Row colouring */
+.noor-att-row.noor-att-absent  td { background-color: rgba(220,53,69,.06);  }
+.noor-att-row.noor-att-late    td { background-color: rgba(230,168,23,.08); }
+.noor-att-row.noor-att-excused td { background-color: rgba(0,0,0,.03);      }
+
+.noor-att-loader-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+.noor-att-summary {
+    color: var(--tms-muted, #64748b);
+    font-size: .85rem;
+    margin: 0 0 10px;
+}
+
+.noor-hint {
+    font-size: .78rem;
+    color: var(--tms-muted, #64748b);
+    margin: 0;
+}
+
+/* ==========================================================================
+   Correction Modal (public portal)
+   ========================================================================== */
+.noor-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.48);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.noor-modal-overlay[hidden] { display: none; }
+
+.noor-modal-box {
+    background: var(--tms-card, #fff);
+    border-radius: var(--tms-radius, 10px);
+    width: 92%;
+    max-width: 480px;
+    box-shadow: var(--tms-shadow-hover, 0 6px 24px rgba(30,58,95,.18));
+    overflow: hidden;
+}
+
+.noor-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--tms-border, #dde3ed);
+    background: var(--tms-bg, #f0f4f9);
+}
+
+.noor-modal-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--tms-primary, #1e3a5f);
+}
+
+.noor-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--tms-muted, #64748b);
+    line-height: 1;
+    padding: 0 4px;
+    transition: var(--tms-transition);
+}
+.noor-modal-close:hover { color: var(--tms-danger, #dc3545); }
+
+.noor-modal-body  { padding: 18px 20px; }
+.noor-modal-body p { margin: 0 0 8px; font-size: .9rem; }
+
+.noor-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--tms-border, #dde3ed);
+    background: var(--tms-bg, #f0f4f9);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.noor-textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--tms-border, #dde3ed);
+    border-radius: 6px;
+    font-size: .9rem;
+    resize: vertical;
+    box-sizing: border-box;
+}
