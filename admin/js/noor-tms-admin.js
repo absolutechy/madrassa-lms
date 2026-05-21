@@ -391,7 +391,168 @@
     } );
 
     // -----------------------------------------------------------------------
-    // 10.  Attendance Correction Modal (admin history tab)
+    // 10.  Session Management (Sessions tab)
+    // -----------------------------------------------------------------------
+
+    /** Derive a session label from a 24-hour time string "HH:MM". */
+    function deriveSessionLabel( timeStr ) {
+        const hour = parseInt( timeStr.split( ':' )[ 0 ], 10 );
+        if ( hour >= 20 || hour < 5 ) return 'Night';
+        if ( hour >= 17 )             return 'Evening';
+        if ( hour >= 12 )             return 'Afternoon';
+        if ( hour >= 8  )             return 'Morning';
+        return 'Early Morning';
+    }
+
+    // Auto-update label preview as time changes.
+    $( document ).on( 'change input', '#noor-new-session-time', function () {
+        const label = deriveSessionLabel( $( this ).val() );
+        $( '#noor-new-session-label' ).val( label );
+    } );
+
+    // Create session.
+    $( document ).on( 'click', '#noor-create-session-btn', function () {
+        const $btn       = $( this );
+        const time       = $( '#noor-new-session-time' ).val();
+        const label      = $( '#noor-new-session-label' ).val().trim();
+        const $feedback  = $( '#noor-create-session-feedback' );
+
+        if ( ! time ) {
+            $feedback.addClass( 'is-error' ).text( 'Please choose a time.' );
+            return;
+        }
+
+        $btn.prop( 'disabled', true ).text( noorTMS.i18n.saving );
+        $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:       'noor_tms_create_session',
+            nonce:        noorTMS.nonce,
+            session_time: time,
+            label:        label,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $feedback.addClass( 'is-success' ).text( r.data.message );
+                // Reload to refresh the table with the new row.
+                setTimeout( function () { window.location.reload(); }, 900 );
+            } else {
+                $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+            }
+        } )
+        .fail( function () {
+            $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+        } )
+        .always( function () {
+            $btn.prop( 'disabled', false ).text( 'Add Session' );
+        } );
+    } );
+
+    // Toggle session active/inactive.
+    $( document ).on( 'click', '.noor-toggle-session', function () {
+        const $btn  = $( this );
+        const id    = $btn.data( 'id' );
+
+        $btn.prop( 'disabled', true );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:     'noor_tms_toggle_session',
+            nonce:      noorTMS.nonce,
+            session_id: id,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                const isActive = r.data.is_active;
+                const $row     = $( '#noor-sess-row-' + id );
+                const $badge   = $row.find( '.noor-sess-status' );
+
+                $badge
+                    .removeClass( 'noor-badge--active noor-badge--inactive' )
+                    .addClass( isActive ? 'noor-badge--active' : 'noor-badge--inactive' )
+                    .text( isActive ? 'Active' : 'Inactive' );
+
+                $btn.data( 'active', isActive )
+                    .text( isActive ? 'Deactivate' : 'Activate' );
+            } else {
+                alert( r.data.message || noorTMS.i18n.error );
+            }
+        } )
+        .fail( function () {
+            alert( noorTMS.i18n.error );
+        } )
+        .always( function () {
+            $btn.prop( 'disabled', false );
+        } );
+    } );
+
+    // Delete session.
+    $( document ).on( 'click', '.noor-delete-session', function () {
+        const $btn  = $( this );
+        const id    = $btn.data( 'id' );
+        const label = $btn.data( 'label' ) || 'this session';
+
+        if ( ! confirm( 'Delete session "' + label + '"? Existing attendance records using this slot will still show the slot key.' ) ) {
+            return;
+        }
+
+        $btn.prop( 'disabled', true ).text( noorTMS.i18n.deleting );
+
+        $.post( noorTMS.ajaxUrl, {
+            action:     'noor_tms_delete_session',
+            nonce:      noorTMS.nonce,
+            session_id: id,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $( '#noor-sess-row-' + id ).fadeOut( 300, function () { $( this ).remove(); } );
+            } else {
+                alert( r.data.message || noorTMS.i18n.error );
+                $btn.prop( 'disabled', false ).text( 'Delete' );
+            }
+        } )
+        .fail( function () {
+            alert( noorTMS.i18n.error );
+            $btn.prop( 'disabled', false ).text( 'Delete' );
+        } );
+    } );
+
+    // Save session limit.
+    $( document ).on( 'click', '#noor-save-session-limit', function () {
+        const $btn      = $( this );
+        const limit     = parseInt( $( '#noor-session-limit-input' ).val(), 10 );
+        const $feedback = $( '#noor-limit-feedback' );
+
+        if ( isNaN( limit ) || limit < 1 ) {
+            $feedback.addClass( 'is-error' ).text( 'Please enter a valid limit (1–20).' );
+            return;
+        }
+
+        $btn.prop( 'disabled', true ).text( noorTMS.i18n.saving );
+        $feedback.text( '' ).removeClass( 'is-error is-success' );
+
+        $.post( noorTMS.ajaxUrl, {
+            action: 'noor_tms_set_session_limit',
+            nonce:  noorTMS.nonce,
+            limit:  limit,
+        } )
+        .done( function ( r ) {
+            if ( r.success ) {
+                $feedback.addClass( 'is-success' ).text( r.data.message );
+                $( '#noor-session-limit-input' ).val( r.data.limit );
+            } else {
+                $feedback.addClass( 'is-error' ).text( r.data.message || noorTMS.i18n.error );
+            }
+        } )
+        .fail( function () {
+            $feedback.addClass( 'is-error' ).text( noorTMS.i18n.error );
+        } )
+        .always( function () {
+            $btn.prop( 'disabled', false ).text( 'Save Limit' );
+        } );
+    } );
+
+    // -----------------------------------------------------------------------
+    // 11.  Attendance Correction Modal (admin history tab)
     // -----------------------------------------------------------------------
 
     const $corrModal   = $( '#noor-correction-modal' );

@@ -34,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '7.0';
+	private const SCHEMA_VERSION = '8.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -183,6 +183,23 @@ class DatabaseHandler {
 		) {$charset_collate};";
 
 		// ----------------------------------------------------------------
+		// Attendance sessions  (dynamic, admin-managed)
+		// ----------------------------------------------------------------
+		$sql_sessions = "CREATE TABLE " . self::sessions_table() . " (
+			id           BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			slot_key     VARCHAR(30)         NOT NULL,
+			label        VARCHAR(100)        NOT NULL DEFAULT '',
+			session_time TIME                NOT NULL,
+			is_active    TINYINT(1)          NOT NULL DEFAULT 1,
+			sort_order   SMALLINT(5)         NOT NULL DEFAULT 0,
+			created_at   DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_slot_key   (slot_key),
+			UNIQUE KEY uniq_sess_time  (session_time),
+			KEY idx_active_order       (is_active, sort_order)
+		) {$charset_collate};";
+
+		// ----------------------------------------------------------------
 		// Teacher attendance  (one row per teacher per day)
 		// ----------------------------------------------------------------
 		$sql_teacher_att = "CREATE TABLE " . self::teacher_attendance_table() . " (
@@ -319,6 +336,7 @@ class DatabaseHandler {
 		dbDelta( $sql_chat_threads );
 		dbDelta( $sql_chat_messages );
 		dbDelta( $sql_audit_log );
+		dbDelta( $sql_sessions );
 
 		$installed = get_option( self::SCHEMA_OPTION, '1.0' );
 
@@ -376,6 +394,29 @@ class DatabaseHandler {
 			// phpcs:enable WordPress.DB.DirectDatabaseQuery
 		}
 
+		// v8.0: Add dynamic attendance sessions table and seed the 4 default sessions.
+		if ( version_compare( $installed, '8.0', '<' ) ) {
+			dbDelta( $sql_sessions );
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery
+			$existing_sessions = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::sessions_table() );
+			if ( 0 === $existing_sessions ) {
+				$defaults = [
+					[ 'morning',   'Morning',   '09:00:00', 10 ],
+					[ 'afternoon', 'Afternoon', '13:00:00', 20 ],
+					[ 'evening',   'Evening',   '17:00:00', 30 ],
+					[ 'night',     'Night',     '22:00:00', 40 ],
+				];
+				foreach ( $defaults as [ $key, $label, $time, $order ] ) {
+					$wpdb->insert(
+						self::sessions_table(),
+						[ 'slot_key' => $key, 'label' => $label, 'session_time' => $time, 'is_active' => 1, 'sort_order' => $order ],
+						[ '%s', '%s', '%s', '%d', '%d' ]
+					);
+				}
+			}
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery
+		}
+
 		update_option( self::SCHEMA_OPTION, self::SCHEMA_VERSION );
 	}
 
@@ -389,6 +430,7 @@ class DatabaseHandler {
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::chat_threads_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::support_requests_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::audit_log_table() );
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::sessions_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::teacher_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::student_attendance_table() );
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::class_teachers_table() );
@@ -454,30 +496,247 @@ class DatabaseHandler {
 		return $wpdb->prefix . 'mms_attendance_audit_log';
 	}
 
+	public static function sessions_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'mms_attendance_sessions';
+	}
+
+	// -----------------------------------------------------------------------
+	// Session helpers
+	// -----------------------------------------------------------------------
+
 	/**
-	 * Returns the four daily attendance time slots (key → label).
+	 * Derive a human-readable label from a 24-hour time string (HH:MM).
+	 */
+	public static function derive_session_label( string $time_hhmm ): string {
+		$hour = (int) substr( $time_hhmm, 0, 2 );
+		if ( $hour >= 20 || $hour < 5 ) return __( 'Night',         'noor-tms' );
+		if ( $hour >= 17 )              return __( 'Evening',        'noor-tms' );
+		if ( $hour >= 12 )              return __( 'Afternoon',      'noor-tms' );
+		if ( $hour >= 8  )              return __( 'Morning',        'noor-tms' );
+		return __( 'Early Morning', 'noor-tms' );
+	}
+
+	/**
+	 * Derive a unique slot key from a time string (HH:MM → "HHMM").
+	 */
+	public static function derive_slot_key( string $time_hhmm ): string {
+		return preg_replace( '/[^0-9]/', '', substr( $time_hhmm, 0, 5 ) );
+	}
+
+	/**
+	 * Returns active attendance sessions as [ slot_key => 'Label (HH:MM AM)' ].
+	 * Falls back to hardcoded defaults if the table is empty or unavailable.
 	 *
 	 * @return array<string, string>
 	 */
 	public static function get_time_slots(): array {
+		if ( null !== self::$slots_cache ) {
+			return self::$slots_cache;
+		}
+
+		global $wpdb;
+		$rows = $wpdb->get_results( // phpcs:ignore
+			'SELECT slot_key, label, session_time FROM ' . self::sessions_table() .
+			' WHERE is_active = 1 ORDER BY sort_order ASC, session_time ASC',
+			ARRAY_A
+		);
+
+		if ( empty( $rows ) ) {
+			self::$slots_cache = [
+				'morning'   => __( 'Morning (9:00 AM)',   'noor-tms' ),
+				'afternoon' => __( 'Afternoon (1:00 PM)', 'noor-tms' ),
+				'evening'   => __( 'Evening (5:00 PM)',   'noor-tms' ),
+				'night'     => __( 'Night (10:00 PM)',    'noor-tms' ),
+			];
+			return self::$slots_cache;
+		}
+
+		$result = [];
+		foreach ( $rows as $row ) {
+			$formatted = date_i18n( 'g:i A', strtotime( $row['session_time'] ) );
+			$result[ $row['slot_key'] ] = $row['label'] . ' (' . $formatted . ')';
+		}
+		self::$slots_cache = $result;
+		return self::$slots_cache;
+	}
+
+	/**
+	 * Detect the current active session's slot_key based on server time.
+	 * Each session "owns" the period from its start until the next session starts.
+	 */
+	public static function current_time_slot(): string {
+		global $wpdb;
+		$now = strtotime( current_time( 'H:i:s' ) );
+
+		$sessions = $wpdb->get_results( // phpcs:ignore
+			'SELECT slot_key, session_time FROM ' . self::sessions_table() .
+			' WHERE is_active = 1 ORDER BY session_time ASC',
+			ARRAY_A
+		);
+
+		if ( empty( $sessions ) ) {
+			$hour = (int) current_time( 'H' );
+			if ( $hour >= 21 ) return 'night';
+			if ( $hour >= 16 ) return 'evening';
+			if ( $hour >= 12 ) return 'afternoon';
+			return 'morning';
+		}
+
+		$current = $sessions[0]['slot_key'];
+		foreach ( $sessions as $s ) {
+			if ( $now >= strtotime( $s['session_time'] ) ) {
+				$current = $s['slot_key'];
+			}
+		}
+		return $current;
+	}
+
+	// -----------------------------------------------------------------------
+	// Session CRUD
+	// -----------------------------------------------------------------------
+
+	/** Returns all sessions (active + inactive), ordered by time. */
+	public static function get_all_sessions(): array {
+		global $wpdb;
+		return $wpdb->get_results( // phpcs:ignore
+			'SELECT * FROM ' . self::sessions_table() . ' ORDER BY sort_order ASC, session_time ASC',
+			ARRAY_A
+		) ?: [];
+	}
+
+	/** Get / set the configurable session limit stored in wp_options. */
+	public static function get_session_limit(): int {
+		return max( 1, (int) get_option( 'noor_tms_session_limit', 4 ) );
+	}
+
+	public static function set_session_limit( int $limit ): void {
+		update_option( 'noor_tms_session_limit', max( 1, min( 20, $limit ) ) );
+	}
+
+	/**
+	 * Create a new session.
+	 *
+	 * @param string $time_hhmm  e.g. "14:30"
+	 * @param string $label      Human-readable label (auto-derived if blank).
+	 * @return array{id: int, slot_key: string, label: string}|array{error: string}
+	 */
+	public static function create_session( string $time_hhmm, string $label = '' ): array {
+		global $wpdb;
+
+		// Normalise to HH:MM
+		$clean_time = date( 'H:i', strtotime( $time_hhmm ) );
+		if ( ! $clean_time || '00:00' === $clean_time && $time_hhmm !== '00:00' ) {
+			return [ 'error' => __( 'Invalid time.', 'noor-tms' ) ];
+		}
+
+		$slot_key  = self::derive_slot_key( $clean_time );
+		$label     = $label ? sanitize_text_field( $label ) : self::derive_session_label( $clean_time );
+		$sort_order = (int) str_replace( ':', '', $clean_time ); // e.g., "09:30" → 930
+
+		// Uniqueness: slot_key
+		$exists = $wpdb->get_var( // phpcs:ignore
+			$wpdb->prepare( 'SELECT id FROM ' . self::sessions_table() . ' WHERE slot_key = %s', $slot_key )
+		);
+		if ( $exists ) {
+			return [ 'error' => __( 'A session for this time already exists.', 'noor-tms' ) ];
+		}
+
+		// Limit: count active sessions
+		$active = (int) $wpdb->get_var( // phpcs:ignore
+			'SELECT COUNT(*) FROM ' . self::sessions_table() . ' WHERE is_active = 1'
+		);
+		$limit = self::get_session_limit();
+		if ( $active >= $limit ) {
+			return [
+				'error' => sprintf(
+					/* translators: %d: session limit */
+					__( 'Active session limit of %d reached. Deactivate or delete a session first.', 'noor-tms' ),
+					$limit
+				),
+			];
+		}
+
+		$inserted = $wpdb->insert(
+			self::sessions_table(),
+			[
+				'slot_key'     => $slot_key,
+				'label'        => $label,
+				'session_time' => $clean_time . ':00',
+				'is_active'    => 1,
+				'sort_order'   => $sort_order,
+			],
+			[ '%s', '%s', '%s', '%d', '%d' ]
+		);
+
+		if ( ! $inserted ) {
+			return [ 'error' => __( 'Database error. Please try again.', 'noor-tms' ) ];
+		}
+
+		// Invalidate static cache.
+		self::flush_slots_cache();
+
 		return [
-			'morning'   => __( 'Morning (9:00 AM)',   'noor-tms' ),
-			'afternoon' => __( 'Afternoon (1:00 PM)', 'noor-tms' ),
-			'evening'   => __( 'Evening (5:00 PM)',   'noor-tms' ),
-			'night'     => __( 'Night (10:00 PM)',    'noor-tms' ),
+			'id'       => (int) $wpdb->insert_id,
+			'slot_key' => $slot_key,
+			'label'    => $label,
 		];
 	}
 
 	/**
-	 * Detect the current active time slot based on server time.
+	 * Delete a session by ID.
+	 * Note: existing attendance records keep the slot_key — they will still display,
+	 * but without a matching active session label.
 	 */
-	public static function current_time_slot(): string {
-		$hour = (int) current_time( 'H' );
-		if ( $hour >= 21 ) return 'night';
-		if ( $hour >= 16 ) return 'evening';
-		if ( $hour >= 12 ) return 'afternoon';
-		return 'morning';
+	public static function delete_session( int $id ): bool {
+		global $wpdb;
+		$ok = (bool) $wpdb->delete( self::sessions_table(), [ 'id' => $id ], [ '%d' ] );
+		if ( $ok ) {
+			self::flush_slots_cache();
+		}
+		return $ok;
 	}
+
+	/**
+	 * Toggle a session's is_active flag.
+	 *
+	 * @return array{is_active: int}|array{error: string}
+	 */
+	public static function toggle_session( int $id ): array {
+		global $wpdb;
+
+		$row = $wpdb->get_row( // phpcs:ignore
+			$wpdb->prepare( 'SELECT * FROM ' . self::sessions_table() . ' WHERE id = %d', $id ),
+			ARRAY_A
+		);
+		if ( ! $row ) {
+			return [ 'error' => __( 'Session not found.', 'noor-tms' ) ];
+		}
+
+		$new_active = $row['is_active'] ? 0 : 1;
+
+		if ( $new_active ) {
+			$active = (int) $wpdb->get_var( // phpcs:ignore
+				'SELECT COUNT(*) FROM ' . self::sessions_table() . ' WHERE is_active = 1'
+			);
+			if ( $active >= self::get_session_limit() ) {
+				return [ 'error' => __( 'Session limit reached. Deactivate another session first.', 'noor-tms' ) ];
+			}
+		}
+
+		$wpdb->update( self::sessions_table(), [ 'is_active' => $new_active ], [ 'id' => $id ], [ '%d' ], [ '%d' ] );
+		self::flush_slots_cache();
+
+		return [ 'is_active' => $new_active ];
+	}
+
+	/** Clear the in-process static cache for get_time_slots(). */
+	private static function flush_slots_cache(): void {
+		self::$slots_cache = null;
+	}
+
+	/** In-process cache for get_time_slots(). Reset by flush_slots_cache(). */
+	private static ?array $slots_cache = null;
 
 	public static function fee_structure_table(): string {
 		global $wpdb;

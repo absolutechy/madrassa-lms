@@ -271,6 +271,22 @@ class Admin {
 		$this->attendance->ajax_correct_attendance();
 	}
 
+	public function ajax_create_session(): void {
+		$this->attendance->ajax_create_session();
+	}
+
+	public function ajax_delete_session(): void {
+		$this->attendance->ajax_delete_session();
+	}
+
+	public function ajax_toggle_session(): void {
+		$this->attendance->ajax_toggle_session();
+	}
+
+	public function ajax_set_session_limit(): void {
+		$this->attendance->ajax_set_session_limit();
+	}
+
 	// -----------------------------------------------------------------------
 	// Admin live-chat AJAX handlers
 	// -----------------------------------------------------------------------

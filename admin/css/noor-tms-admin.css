@@ -956,3 +956,14 @@ span.required {
 
 .noor-ajax-feedback.is-success { color: #25a05c; font-weight: 600; }
 .noor-ajax-feedback.is-error   { color: #dc3545; font-weight: 600; }
+
+/* ==========================================================================
+   Sessions Tab
+   ========================================================================== */
+.noor-session-limit-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}

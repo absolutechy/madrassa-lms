@@ -52,7 +52,7 @@ class Attendance {
 	// -----------------------------------------------------------------------
 
 	public function page_attendance(): void {
-		$can_manage = current_user_can( 'noor_tms_manage' );
+		$can_manage = noor_tms_can_manage();
 		$can_teach  = current_user_can( 'noor_tms_teacher' );
 
 		if ( ! $can_manage && ! $can_teach ) {
@@ -109,12 +109,13 @@ class Attendance {
 			<!-- Tabs -->
 			<nav class="nav-tab-wrapper noor-tab-nav">
 				<?php
-				$base_url = admin_url( 'admin.php?page=noor-tms-attendance' );
-				foreach ( [
-					'mark'      => __( 'Mark Attendance', 'noor-tms' ),
-					'history'   => __( 'History',          'noor-tms' ),
-					'audit_log' => __( 'Audit Log',        'noor-tms' ),
-				] as $t => $label ) :
+			$base_url = admin_url( 'admin.php?page=noor-tms-attendance' );
+			foreach ( [
+				'mark'      => __( 'Mark Attendance', 'noor-tms' ),
+				'history'   => __( 'History',          'noor-tms' ),
+				'sessions'  => __( 'Sessions',         'noor-tms' ),
+				'audit_log' => __( 'Audit Log',        'noor-tms' ),
+			] as $t => $label ) :
 				?>
 				<a href="<?php echo esc_url( add_query_arg( 'tab', $t, $base_url ) ); ?>"
 				   class="nav-tab <?php echo $tab === $t ? 'nav-tab-active' : ''; ?>">
@@ -123,17 +124,19 @@ class Attendance {
 				<?php endforeach; ?>
 			</nav>
 
-			<?php
-			if ( 'mark' === $tab ) {
-				$this->render_mark_tab( $classes, $class_id, $att_date, $time_slot, $mode, $current_slot, $can_manage );
-			} elseif ( 'history' === $tab ) {
-				$this->render_history_tab(
-					$classes, $paged, $per_page, $can_manage,
-					$f_date_from, $f_date_to, $f_slot, $f_status, $f_class_id, $f_search
-				);
-			} else {
-				$this->render_audit_log_tab( $can_manage );
-			}
+		<?php
+		if ( 'mark' === $tab ) {
+			$this->render_mark_tab( $classes, $class_id, $att_date, $time_slot, $mode, $current_slot, $can_manage );
+		} elseif ( 'history' === $tab ) {
+			$this->render_history_tab(
+				$classes, $paged, $per_page, $can_manage,
+				$f_date_from, $f_date_to, $f_slot, $f_status, $f_class_id, $f_search
+			);
+		} elseif ( 'sessions' === $tab ) {
+			$this->render_sessions_tab( $can_manage );
+		} else {
+			$this->render_audit_log_tab( $can_manage );
+		}
 			?>
 		</div>
 
@@ -606,6 +609,126 @@ class Attendance {
 	}
 
 	// -----------------------------------------------------------------------
+	// Sessions Tab
+	// -----------------------------------------------------------------------
+
+	private function render_sessions_tab( bool $can_manage ): void {
+		if ( ! $can_manage ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
+		}
+
+		$sessions = DatabaseHandler::get_all_sessions();
+		$limit    = DatabaseHandler::get_session_limit();
+		$active   = count( array_filter( $sessions, fn( $s ) => (int) $s['is_active'] ) );
+		?>
+		<div class="noor-tms-card" style="margin-top:12px;">
+			<h2><?php esc_html_e( 'Attendance Sessions', 'noor-tms' ); ?></h2>
+			<p class="description">
+				<?php esc_html_e( 'Create on-demand sessions for attendance marking. Each session label is auto-derived from the selected time.', 'noor-tms' ); ?>
+			</p>
+
+			<!-- Session limit -->
+			<div class="noor-session-limit-row">
+				<label for="noor-session-limit-input"><strong><?php esc_html_e( 'Active Session Limit:', 'noor-tms' ); ?></strong></label>
+				<input type="number" id="noor-session-limit-input" value="<?php echo esc_attr( $limit ); ?>" min="1" max="20" style="width:70px;" />
+				<button type="button" id="noor-save-session-limit" class="button button-secondary">
+					<?php esc_html_e( 'Save Limit', 'noor-tms' ); ?>
+				</button>
+				<span id="noor-limit-feedback" class="noor-ajax-feedback" aria-live="polite"></span>
+			</div>
+			<p class="description" style="margin-top:4px;">
+				<?php
+				printf(
+					/* translators: 1: active count, 2: limit */
+					esc_html__( '%1$d of %2$d active slots in use.', 'noor-tms' ),
+					$active,
+					$limit
+				);
+				?>
+			</p>
+
+			<!-- Session list -->
+			<?php if ( ! empty( $sessions ) ) : ?>
+			<table class="wp-list-table widefat fixed striped noor-tms-table" style="margin-top:16px;" id="noor-sessions-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Label', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Time', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Slot Key', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Status', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Actions', 'noor-tms' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $sessions as $sess ) : ?>
+					<tr id="noor-sess-row-<?php echo esc_attr( $sess['id'] ); ?>">
+						<td><strong><?php echo esc_html( $sess['label'] ); ?></strong></td>
+						<td><?php echo esc_html( date_i18n( 'g:i A', strtotime( $sess['session_time'] ) ) ); ?></td>
+						<td><code><?php echo esc_html( $sess['slot_key'] ); ?></code></td>
+						<td>
+							<span class="noor-sess-status noor-badge <?php echo $sess['is_active'] ? 'noor-badge--active' : 'noor-badge--inactive'; ?>">
+								<?php echo $sess['is_active'] ? esc_html__( 'Active', 'noor-tms' ) : esc_html__( 'Inactive', 'noor-tms' ); ?>
+							</span>
+						</td>
+						<td style="display:flex;gap:6px;">
+							<button type="button"
+									class="button button-small noor-toggle-session"
+									data-id="<?php echo esc_attr( $sess['id'] ); ?>"
+									data-active="<?php echo esc_attr( $sess['is_active'] ); ?>">
+								<?php echo $sess['is_active'] ? esc_html__( 'Deactivate', 'noor-tms' ) : esc_html__( 'Activate', 'noor-tms' ); ?>
+							</button>
+							<button type="button"
+									class="button button-small button-link-delete noor-delete-session"
+									data-id="<?php echo esc_attr( $sess['id'] ); ?>"
+									data-label="<?php echo esc_attr( $sess['label'] ); ?>">
+								<?php esc_html_e( 'Delete', 'noor-tms' ); ?>
+							</button>
+						</td>
+					</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			<?php else : ?>
+			<p><?php esc_html_e( 'No sessions yet. Create one below.', 'noor-tms' ); ?></p>
+			<?php endif; ?>
+
+			<!-- Create session form -->
+			<div class="noor-tms-card" style="margin-top:20px;background:#f9f9f9;">
+				<h3 style="margin-top:0;"><?php esc_html_e( 'Create New Session', 'noor-tms' ); ?></h3>
+				<?php if ( $active >= $limit ) : ?>
+				<p class="noor-notice" style="background:#fff3cd;border-left:4px solid #e6a817;padding:8px 12px;border-radius:3px;">
+					<?php
+					printf(
+						esc_html__( 'Session limit (%d active) reached. Deactivate or delete an existing session before adding a new one.', 'noor-tms' ),
+						$limit
+					);
+					?>
+				</p>
+				<?php endif; ?>
+				<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+					<label>
+						<strong><?php esc_html_e( 'Session Time:', 'noor-tms' ); ?></strong><br>
+						<input type="time" id="noor-new-session-time" value="09:00" style="font-size:1rem;" />
+					</label>
+					<label>
+						<strong><?php esc_html_e( 'Auto Label:', 'noor-tms' ); ?></strong><br>
+						<input type="text" id="noor-new-session-label" value="Morning" style="width:160px;"
+							   placeholder="<?php esc_attr_e( 'e.g. Morning', 'noor-tms' ); ?>" />
+					</label>
+					<button type="button" id="noor-create-session-btn" class="button button-primary">
+						<?php esc_html_e( 'Add Session', 'noor-tms' ); ?>
+					</button>
+					<span id="noor-create-session-feedback" class="noor-ajax-feedback" aria-live="polite"></span>
+				</div>
+				<p class="description" style="margin-top:8px;">
+					<?php esc_html_e( 'The label is automatically derived from the time and can be edited before saving.', 'noor-tms' ); ?>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	// -----------------------------------------------------------------------
 	// Correction modal (rendered once per page)
 	// -----------------------------------------------------------------------
 
@@ -660,7 +783,7 @@ class Attendance {
 	public function ajax_save_student_attendance(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		$can_manage = current_user_can( 'noor_tms_manage' );
+		$can_manage = noor_tms_can_manage();
 		$can_teach  = current_user_can( 'noor_tms_teacher' );
 
 		if ( ! $can_manage && ! $can_teach ) {
@@ -712,13 +835,100 @@ class Attendance {
 	}
 
 	// -----------------------------------------------------------------------
+	// AJAX: session management
+	// -----------------------------------------------------------------------
+
+	public function ajax_create_session(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$time  = sanitize_text_field( $_POST['session_time'] ?? '' );
+		$label = sanitize_text_field( $_POST['label']        ?? '' );
+
+		if ( ! $time ) {
+			wp_send_json_error( [ 'message' => __( 'Session time is required.', 'noor-tms' ) ] );
+		}
+
+		$result = DatabaseHandler::create_session( $time, $label );
+
+		if ( isset( $result['error'] ) ) {
+			wp_send_json_error( [ 'message' => $result['error'] ] );
+		}
+
+		$limit  = DatabaseHandler::get_session_limit();
+		$active = count( array_filter( DatabaseHandler::get_all_sessions(), fn( $s ) => (int) $s['is_active'] ) );
+
+		wp_send_json_success( [
+			'message'      => __( 'Session created.', 'noor-tms' ),
+			'session'      => $result,
+			'active_count' => $active,
+			'limit'        => $limit,
+		] );
+	}
+
+	public function ajax_delete_session(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$id = (int) ( $_POST['session_id'] ?? 0 );
+		if ( ! $id ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid session.', 'noor-tms' ) ] );
+		}
+
+		if ( DatabaseHandler::delete_session( $id ) ) {
+			wp_send_json_success( [ 'message' => __( 'Session deleted.', 'noor-tms' ) ] );
+		} else {
+			wp_send_json_error( [ 'message' => __( 'Could not delete session.', 'noor-tms' ) ] );
+		}
+	}
+
+	public function ajax_toggle_session(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$id     = (int) ( $_POST['session_id'] ?? 0 );
+		$result = DatabaseHandler::toggle_session( $id );
+
+		if ( isset( $result['error'] ) ) {
+			wp_send_json_error( [ 'message' => $result['error'] ] );
+		}
+
+		wp_send_json_success( [
+			'is_active' => $result['is_active'],
+			'message'   => $result['is_active']
+				? __( 'Session activated.', 'noor-tms' )
+				: __( 'Session deactivated.', 'noor-tms' ),
+		] );
+	}
+
+	public function ajax_set_session_limit(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$limit = (int) ( $_POST['limit'] ?? 4 );
+		DatabaseHandler::set_session_limit( $limit );
+		wp_send_json_success( [
+			'limit'   => DatabaseHandler::get_session_limit(),
+			'message' => __( 'Session limit updated.', 'noor-tms' ),
+		] );
+	}
+
+	// -----------------------------------------------------------------------
 	// AJAX: correct a historical attendance record (with audit log)
 	// -----------------------------------------------------------------------
 
 	public function ajax_correct_attendance(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
 		}
 
