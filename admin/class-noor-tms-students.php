@@ -235,6 +235,10 @@ class Students {
 		}
 
 		$classes = DatabaseHandler::get_classes_dropdown();
+		$all_categories = DatabaseHandler::get_categories();
+		$parent_categories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] === 0 ) );
+		$subcategories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] > 0 ) );
+		$has_mixed_category_types = count( array_unique( array_map( fn( $c ) => (string) $c['account_type'], $parent_categories ) ) ) > 1;
 		$title   = $student ? __( 'Edit Student', 'noor-tms' ) : __( 'Add New Student', 'noor-tms' );
 		?>
 		<div class="wrap noor-tms-wrap">
@@ -302,6 +306,50 @@ class Students {
 						</tr>
 						<tr>
 							<th scope="row">
+								<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<?php if ( empty( $parent_categories ) ) : ?>
+									<p class="description"><?php esc_html_e( 'No categories found. Add categories first.', 'noor-tms' ); ?></p>
+								<?php else : ?>
+									<select id="category_id" name="category_id" class="regular-text">
+										<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
+										<?php foreach ( $parent_categories as $cat ) : ?>
+											<?php
+											$label = $cat['name'];
+											if ( $has_mixed_category_types ) {
+												$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
+												$label = $type_label . ' - ' . $label;
+											}
+											?>
+											<option value="<?php echo esc_attr( $cat['id'] ); ?>" <?php selected( (int) ( $student['category_id'] ?? 0 ), (int) $cat['id'] ); ?>>
+												<?php echo esc_html( $label ); ?>
+											</option>
+										<?php endforeach; ?>
+									</select>
+								<?php endif; ?>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<select id="subcategory_id" name="subcategory_id" class="regular-text">
+									<option value="0"><?php esc_html_e( '— Select Sub-Category —', 'noor-tms' ); ?></option>
+									<?php foreach ( $subcategories as $subcat ) : ?>
+										<option value="<?php echo esc_attr( $subcat['id'] ); ?>"
+											data-parent="<?php echo esc_attr( $subcat['parent_id'] ); ?>"
+											<?php selected( (int) ( $student['subcategory_id'] ?? 0 ), (int) $subcat['id'] ); ?>>
+											<?php echo esc_html( $subcat['name'] ); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+								<p class="description"><?php esc_html_e( 'Optional. Choose a sub-category under the selected category.', 'noor-tms' ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
 								<label for="enrollment_date"><?php esc_html_e( 'Enrollment Date', 'noor-tms' ); ?></label>
 							</th>
 							<td>
@@ -315,18 +363,34 @@ class Students {
 								<label for="gender"><?php esc_html_e( 'Gender', 'noor-tms' ); ?></label>
 							</th>
 							<td>
-								<select id="gender" name="gender">
-									<?php
-									foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
-										printf(
-											'<option value="%s"%s>%s</option>',
-											esc_attr( $val ),
-											selected( $student['gender'] ?? 'male', $val, false ),
-											esc_html( $lbl )
-										);
-									}
+								<?php
+								$gender_scope = null;
+								if ( current_user_can( 'manage_banaat' ) && ! current_user_can( 'manage_banin' ) ) {
+									$gender_scope = 'female';
+							} elseif ( current_user_can( 'manage_banin' ) && ! current_user_can( 'manage_banaat' ) ) {
+									$gender_scope = 'male';
+								}
+								if ( $gender_scope ) :
+									$label = 'female' === $gender_scope ? __( 'Female', 'noor-tms' ) : __( 'Male', 'noor-tms' );
 									?>
-								</select>
+									<input type="hidden" name="gender" value="<?php echo esc_attr( $gender_scope ); ?>" />
+									<span class="description" style="display:inline-block;padding-top:4px;">
+										<?php echo esc_html( $label ); ?>
+									</span>
+								<?php else : ?>
+									<select id="gender" name="gender">
+										<?php
+										foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
+											printf(
+												'<option value="%s"%s>%s</option>',
+												esc_attr( $val ),
+												selected( $student['gender'] ?? 'male', $val, false ),
+												esc_html( $lbl )
+											);
+										}
+										?>
+									</select>
+								<?php endif; ?>
 							</td>
 						</tr>
 						<tr>
@@ -398,6 +462,8 @@ class Students {
 			'class_id'        => (int) ( $_POST['class_id'] ?? 0 ),
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
+			'category_id'     => (int) ( $_POST['category_id']     ?? 0 ),
+			'subcategory_id'  => (int) ( $_POST['subcategory_id']  ?? 0 ),
 			'enrollment_date' => sanitize_text_field( $_POST['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
 			'gender'          => sanitize_key( $_POST['gender']          ?? 'male' ),
 			'status'          => sanitize_key( $_POST['status'] ?? 'active' ),
@@ -792,6 +858,40 @@ class Students {
 
 						<button type="submit"><?php esc_html_e( 'Update', 'noor-tms' ); ?></button>
 					</form>
+					<script>
+					(function() {
+						const category = document.getElementById('category_id');
+						const subcategory = document.getElementById('subcategory_id');
+						if (!category || !subcategory) return;
+						const options = Array.from(subcategory.options);
+						function syncSubcategories() {
+							const parentId = category.value;
+							let hasMatch = false;
+							options.forEach(option => {
+								if (!option.value) {
+									option.hidden = false;
+									return;
+								}
+								const match = option.dataset.parent === parentId;
+								option.hidden = !match;
+								if (match) hasMatch = true;
+							});
+							if (!parentId || !hasMatch) {
+								if (subcategory.value && subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
+									subcategory.value = '0';
+								}
+								subcategory.disabled = true;
+								return;
+							}
+							subcategory.disabled = false;
+							if (subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
+								subcategory.value = '0';
+							}
+						}
+						category.addEventListener('change', syncSubcategories);
+						syncSubcategories();
+					})();
+					</script>
 
 					<div class="report-actions">
 						<button type="button" class="button-primary" onclick="window.print();"><?php esc_html_e( 'Print', 'noor-tms' ); ?></button>

@@ -77,9 +77,47 @@ include __DIR__ . '/layout.php';
 						);
 						?>
 					</p>
+
+					<div class="noor-form-group">
+						<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
+						<?php if ( empty( $parent_categories ) ) : ?>
+							<p class="noor-form-description"><?php esc_html_e( 'No categories found yet.', 'noor-tms' ); ?></p>
+						<?php else : ?>
+							<select id="category_id" name="category_id">
+								<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
+								<?php foreach ( $parent_categories as $cat ) : ?>
+									<?php
+									$label = $cat['name'];
+									if ( $has_mixed_category_types ) {
+										$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
+										$label = $type_label . ' - ' . $label;
+									}
+									?>
+									<option value="<?php echo esc_attr( $cat['id'] ); ?>" <?php selected( (int) ( $student['category_id'] ?? 0 ), (int) $cat['id'] ); ?>>
+										<?php echo esc_html( $label ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						<?php endif; ?>
+					</div>
 				<?php else : ?>
 					<select id="class_id" name="class_id">
 						<option value="0"><?php esc_html_e( '— No Class —', 'noor-tms' ); ?></option>
+					<div class="noor-form-group">
+						<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
+						<select id="subcategory_id" name="subcategory_id">
+							<option value="0"><?php esc_html_e( '— Select Sub-Category —', 'noor-tms' ); ?></option>
+							<?php foreach ( $subcategories as $subcat ) : ?>
+								<option value="<?php echo esc_attr( $subcat['id'] ); ?>"
+									data-parent="<?php echo esc_attr( $subcat['parent_id'] ); ?>"
+									<?php selected( (int) ( $student['subcategory_id'] ?? 0 ), (int) $subcat['id'] ); ?>>
+									<?php echo esc_html( $subcat['name'] ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="noor-form-description"><?php esc_html_e( 'Optional. Choose a sub-category under the selected category.', 'noor-tms' ); ?></p>
+					</div>
+
 						<?php foreach ( $classes as $cls ) : ?>
 							<option value="<?php echo esc_attr( $cls['id'] ); ?>"
 								<?php selected( (int) ( $student['class_id'] ?? 0 ), (int) $cls['id'] ); ?>>
@@ -99,18 +137,34 @@ include __DIR__ . '/layout.php';
 
 		<div class="noor-form-group" style="max-width:260px;">
 			<label for="gender"><?php esc_html_e( 'Gender', 'noor-tms' ); ?></label>
-			<select id="gender" name="gender">
-				<?php
-				foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
-					printf(
-						'<option value="%s"%s>%s</option>',
-						esc_attr( $val ),
-						selected( $student['gender'] ?? 'male', $val, false ),
-						esc_html( $lbl )
-					);
-				}
+			<?php
+			$gender_scope = null;
+			if ( current_user_can( 'manage_banaat' ) && ! current_user_can( 'manage_banin' ) ) {
+				$gender_scope = 'female';
+			} elseif ( current_user_can( 'manage_banin' ) && ! current_user_can( 'manage_banaat' ) ) {
+				$gender_scope = 'male';
+			}
+			if ( $gender_scope ) :
+				$label = 'female' === $gender_scope ? __( 'Female', 'noor-tms' ) : __( 'Male', 'noor-tms' );
 				?>
-			</select>
+				<input type="hidden" name="gender" value="<?php echo esc_attr( $gender_scope ); ?>" />
+				<div class="noor-form-description" style="margin-top:6px;">
+					<?php echo esc_html( $label ); ?>
+				</div>
+			<?php else : ?>
+				<select id="gender" name="gender">
+					<?php
+					foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
+						printf(
+							'<option value="%s"%s>%s</option>',
+							esc_attr( $val ),
+							selected( $student['gender'] ?? 'male', $val, false ),
+							esc_html( $lbl )
+						);
+					}
+					?>
+				</select>
+			<?php endif; ?>
 		</div>
 
 		<div class="noor-form-group" style="max-width:260px;">
@@ -163,5 +217,40 @@ include __DIR__ . '/layout.php';
 		</div>
 	</form>
 </div>
+
+<script>
+(function() {
+	const category = document.getElementById('category_id');
+	const subcategory = document.getElementById('subcategory_id');
+	if (!category || !subcategory) return;
+	const options = Array.from(subcategory.options);
+	function syncSubcategories() {
+		const parentId = category.value;
+		let hasMatch = false;
+		options.forEach(option => {
+			if (!option.value) {
+				option.hidden = false;
+				return;
+			}
+			const match = option.dataset.parent === parentId;
+			option.hidden = !match;
+			if (match) hasMatch = true;
+		});
+		if (!parentId || !hasMatch) {
+			if (subcategory.value && subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
+				subcategory.value = '0';
+			}
+			subcategory.disabled = true;
+			return;
+		}
+		subcategory.disabled = false;
+		if (subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
+			subcategory.value = '0';
+		}
+	}
+	category.addEventListener('change', syncSubcategories);
+	syncSubcategories();
+})();
+</script>
 
 <?php include __DIR__ . '/layout-close.php'; ?>

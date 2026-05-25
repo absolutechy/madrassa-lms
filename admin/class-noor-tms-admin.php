@@ -18,6 +18,7 @@ class Admin {
 	private Results    $results;
 	private Settings   $settings;
 	private Classes    $classes;
+	private Categories $categories;
 	private Teachers   $teachers;
 	private Attendance $attendance;
 	private Fees       $fees;
@@ -29,6 +30,7 @@ class Admin {
 		$this->results    = new Results();
 		$this->settings   = new Settings();
 		$this->classes    = new Classes();
+		$this->categories = new Categories();
 		$this->teachers   = new Teachers();
 		$this->attendance = new Attendance();
 		$this->fees       = new Fees();
@@ -88,6 +90,15 @@ class Admin {
 			'noor_tms_manage',
 			'noor-tms-classes',
 			[ $this->classes, 'page_classes' ]
+		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Categories', 'noor-tms' ),
+			__( 'Categories', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-categories',
+			[ $this->categories, 'page_categories' ]
 		);
 
 		add_submenu_page(
@@ -176,6 +187,7 @@ class Admin {
 			'noor-tms_page_noor-tms-add-student',
 			'noor-tms_page_noor-tms-results',
 			'noor-tms_page_noor-tms-classes',
+			'noor-tms_page_noor-tms-categories',
 			'noor-tms_page_noor-tms-settings',
 			'noor-tms_page_noor-tms-teachers',
 			'noor-tms_page_noor-tms-attendance',

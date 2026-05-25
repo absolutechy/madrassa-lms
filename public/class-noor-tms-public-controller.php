@@ -279,6 +279,10 @@ class PublicController {
 				exit;
 			}
 			$classes = DatabaseHandler::get_classes_dropdown();
+			$all_categories = DatabaseHandler::get_categories();
+			$parent_categories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] === 0 ) );
+			$subcategories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] > 0 ) );
+			$has_mixed_category_types = count( array_unique( array_map( fn( $c ) => (string) $c['account_type'], $parent_categories ) ) ) > 1;
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/student-form.php';
 		} else {
 			$search   = sanitize_text_field( $_GET['noor_search'] ?? ($_GET['s'] ?? '') );
@@ -1052,6 +1056,8 @@ class PublicController {
 			'class_id'        => (int) ( $_POST['class_id']        ?? 0 ),
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
+			'category_id'     => (int) ( $_POST['category_id']     ?? 0 ),
+			'subcategory_id'  => (int) ( $_POST['subcategory_id']  ?? 0 ),
 			'enrollment_date' => sanitize_text_field( $_POST['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
 			'gender'          => sanitize_key( $_POST['gender']          ?? 'male' ),
 			'status'          => sanitize_key( $_POST['status']                 ?? 'active' ),
