@@ -24,7 +24,7 @@ class Students {
 	 * Students list page.
 	 */
 	public function page_list(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -218,12 +218,15 @@ class Students {
 	 * Add / Edit student form page.
 	 */
 	public function page_form(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
 		$student_id = (int) ( $_GET['student_id'] ?? 0 );
 		$student    = $student_id ? DatabaseHandler::get_student( $student_id ) : null;
+		if ( $student_id && ! $student ) {
+			wp_die( esc_html__( 'Student not found.', 'noor-tms' ) );
+		}
 
 		// Handle form submission.
 		if ( isset( $_POST['noor_tms_student_nonce'] ) ) {
@@ -309,6 +312,25 @@ class Students {
 						</tr>
 						<tr>
 							<th scope="row">
+								<label for="gender"><?php esc_html_e( 'Gender', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<select id="gender" name="gender">
+									<?php
+									foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
+										printf(
+											'<option value="%s"%s>%s</option>',
+											esc_attr( $val ),
+											selected( $student['gender'] ?? 'male', $val, false ),
+											esc_html( $lbl )
+										);
+									}
+									?>
+								</select>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
 								<label for="status"><?php esc_html_e( 'Status', 'noor-tms' ); ?></label>
 							</th>
 							<td>
@@ -377,6 +399,7 @@ class Students {
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
 			'enrollment_date' => sanitize_text_field( $_POST['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
+			'gender'          => sanitize_key( $_POST['gender']          ?? 'male' ),
 			'status'          => sanitize_key( $_POST['status'] ?? 'active' ),
 		];
 
@@ -432,7 +455,7 @@ class Students {
 
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
 		}
 
@@ -449,7 +472,7 @@ class Students {
 	}
 
 	public function handle_print_student(): void {
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 
 		if ( ! $is_manager && ! $is_teacher ) {

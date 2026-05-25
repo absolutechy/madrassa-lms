@@ -21,7 +21,7 @@ class Settings {
 	 * Render settings page and handle form submission.
 	 */
 	public function page_settings(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -253,7 +253,7 @@ class Settings {
 		if ( ! check_admin_referer( 'noor_tms_save_settings', 'noor_tms_settings_nonce' ) ) {
 			wp_die( esc_html__( 'Nonce verification failed.', 'noor-tms' ) );
 		}
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 

@@ -21,7 +21,7 @@ class Classes {
 	// -----------------------------------------------------------------------
 
 	public function page_classes(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -248,7 +248,7 @@ class Classes {
 		$class_id = (int) ( $_POST['class_id'] ?? 0 );
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [], 403 );
 		}
 
@@ -265,7 +265,7 @@ class Classes {
 	public function ajax_get_subjects(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [], 403 );
 		}
 
@@ -281,7 +281,7 @@ class Classes {
 	public function ajax_get_students_for_class(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [], 403 );
 		}
 

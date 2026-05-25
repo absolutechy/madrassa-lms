@@ -25,7 +25,7 @@ class Teachers {
 	// -----------------------------------------------------------------------
 
 	public function page_teachers(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -49,7 +49,7 @@ class Teachers {
 	// -----------------------------------------------------------------------
 
 	public function page_teacher_attendance(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -590,7 +590,7 @@ class Teachers {
 	public function ajax_delete_teacher(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
 		}
 
@@ -608,7 +608,7 @@ class Teachers {
 	public function ajax_save_teacher_attendance(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
 		}
 

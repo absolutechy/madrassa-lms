@@ -98,6 +98,22 @@ include __DIR__ . '/layout.php';
 		</div>
 
 		<div class="noor-form-group" style="max-width:260px;">
+			<label for="gender"><?php esc_html_e( 'Gender', 'noor-tms' ); ?></label>
+			<select id="gender" name="gender">
+				<?php
+				foreach ( [ 'male' => __( 'Male', 'noor-tms' ), 'female' => __( 'Female', 'noor-tms' ) ] as $val => $lbl ) {
+					printf(
+						'<option value="%s"%s>%s</option>',
+						esc_attr( $val ),
+						selected( $student['gender'] ?? 'male', $val, false ),
+						esc_html( $lbl )
+					);
+				}
+				?>
+			</select>
+		</div>
+
+		<div class="noor-form-group" style="max-width:260px;">
 			<label for="status"><?php esc_html_e( 'Status', 'noor-tms' ); ?></label>
 			<select id="status" name="status">
 				<?php

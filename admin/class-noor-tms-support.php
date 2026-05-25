@@ -20,7 +20,7 @@ class Support {
 	 * Render support inbox page.
 	 */
 	public function page_support(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -154,7 +154,7 @@ class Support {
 			wp_die( esc_html__( 'Nonce verification failed.', 'noor-tms' ) );
 		}
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 

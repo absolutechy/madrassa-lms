@@ -96,4 +96,15 @@ function noor_tms(): \Noor_TMS\Includes\Plugin {
 	return \Noor_TMS\Includes\Plugin::get_instance();
 }
 
+if ( ! function_exists( 'noor_tms_can_manage' ) ) {
+	/**
+	 * Check whether the current user can manage TMS data.
+	 */
+	function noor_tms_can_manage(): bool {
+		return current_user_can( 'noor_tms_manage' )
+			|| current_user_can( 'manage_banin' )
+			|| current_user_can( 'manage_banaat' );
+	}
+}
+
 noor_tms()->run();

@@ -26,7 +26,7 @@ class Results {
 	// -----------------------------------------------------------------------
 
 	public function page_results(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -359,7 +359,7 @@ class Results {
 	public function ajax_save_result(): void {
 		check_ajax_referer( 'noor_tms_save_result_ajax', 'noor_tms_result_nonce' );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 		if ( ! $is_manager && ! $is_teacher ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
@@ -450,7 +450,7 @@ class Results {
 	public function ajax_save_report(): void {
 		check_ajax_referer( 'noor_tms_save_result_ajax', 'noor_tms_result_nonce' );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 		if ( ! $is_manager && ! $is_teacher ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
@@ -564,7 +564,7 @@ class Results {
 
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 		if ( ! $is_manager && ! $is_teacher ) {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );

@@ -198,7 +198,7 @@ class PublicController {
 			}
 		}
 
-		$can_access = current_user_can( 'noor_tms_manage' ) || current_user_can( 'noor_tms_teacher' );
+		$can_access = noor_tms_can_manage() || current_user_can( 'noor_tms_teacher' );
 		if ( $is_protected && ( ! is_user_logged_in() || ! $can_access ) ) {
 			wp_safe_redirect( home_url( '/tms-login/' ) );
 			exit;
@@ -207,7 +207,7 @@ class PublicController {
 
 	public function redirect_after_login( string $redirect_to, string $requested, $user ): string {
 		if ( $user instanceof \WP_User ) {
-			if ( $user->has_cap( 'noor_tms_manage' ) && ! $user->has_cap( 'manage_options' ) ) {
+			if ( ( $user->has_cap( 'noor_tms_manage' ) || $user->has_cap( 'manage_banin' ) || $user->has_cap( 'manage_banaat' ) ) && ! $user->has_cap( 'manage_options' ) ) {
 				return home_url( '/tms-students/' );
 			}
 			if ( $user->has_cap( 'noor_tms_teacher' ) ) {
@@ -239,7 +239,7 @@ class PublicController {
 	public function sc_login(): string {
 		// Already logged in as a TMS user → send to dashboard.
 		if ( is_user_logged_in() ) {
-			if ( current_user_can( 'noor_tms_manage' ) ) {
+			if ( noor_tms_can_manage() ) {
 				wp_safe_redirect( home_url( '/tms-students/' ) );
 				exit;
 			}
@@ -263,7 +263,7 @@ class PublicController {
 		$action     = sanitize_key( $_GET['tms_action'] ?? 'list' );
 		$student_id = (int) ( $_GET['student_id'] ?? 0 );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 
 		ob_start();
 
@@ -274,6 +274,10 @@ class PublicController {
 				exit;
 			}
 			$student = $student_id ? DatabaseHandler::get_student( $student_id ) : null;
+			if ( $student_id && ! $student ) {
+				wp_safe_redirect( home_url( '/tms-students/' ) );
+				exit;
+			}
 			$classes = DatabaseHandler::get_classes_dropdown();
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/student-form.php';
 		} else {
@@ -325,7 +329,7 @@ class PublicController {
 		$action   = sanitize_key( $_GET['tms_action'] ?? 'list' );
 		$class_id = (int) ( $_GET['class_id'] ?? 0 );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 
 		ob_start();
@@ -360,7 +364,7 @@ class PublicController {
 		$exam_date  = sanitize_text_field( $_GET['exam_date'] ?? '' );
 		$action     = sanitize_text_field( $_GET['tms_action'] ?? 'list' );
 
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 		$allowed_class_ids = [];
 
@@ -400,7 +404,7 @@ class PublicController {
 	 * [noor_tms_attendance] – Student attendance mark + history.
 	 */
 	public function sc_attendance(): string {
-		$is_manager = current_user_can( 'noor_tms_manage' );
+		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
 
 		// Determine visible classes.
@@ -488,7 +492,7 @@ class PublicController {
 	 * [noor_tms_teachers] – Teacher list + create/edit form (managers only).
 	 */
 	public function sc_teachers(): string {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_safe_redirect( home_url( '/tms-login/' ) );
 			exit;
 		}
@@ -525,7 +529,7 @@ class PublicController {
 	 * [noor_tms_fees] – Student fee management & payments.
 	 */
 	public function sc_fees(): string {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_safe_redirect( home_url( '/tms-login/' ) );
 			exit;
 		}
@@ -629,7 +633,7 @@ class PublicController {
 	 * Handle front-end teacher create/edit form.
 	 */
 	public function process_teacher_form(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
@@ -719,7 +723,7 @@ class PublicController {
 	 */
 	private function require_auth(): void {
 		// Kept for backwards-compat; primary auth is via handle_early_requests().
-		if ( ! is_user_logged_in() || ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! is_user_logged_in() || ! noor_tms_can_manage() ) {
 			wp_safe_redirect( home_url( '/tms-login/' ) );
 			exit;
 		}
@@ -734,7 +738,7 @@ class PublicController {
 	 * Hook: admin_post_noor_tms_save_student
 	 */
 	public function process_student_form(): void {
-		if ( ! is_user_logged_in() || ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! is_user_logged_in() || ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'You do not have permission to do this.', 'noor-tms' ) );
 		}
 
@@ -746,7 +750,7 @@ class PublicController {
 	 * Hook: admin_post_noor_tms_save_class
 	 */
 	public function process_class_form(): void {
-		if ( ! is_user_logged_in() || ( ! current_user_can( 'noor_tms_manage' ) && ! current_user_can( 'noor_tms_teacher' ) ) ) {
+		if ( ! is_user_logged_in() || ( ! noor_tms_can_manage() && ! current_user_can( 'noor_tms_teacher' ) ) ) {
 			wp_die( esc_html__( 'You do not have permission to do this.', 'noor-tms' ) );
 		}
 
@@ -759,7 +763,7 @@ class PublicController {
 	 * Hook: admin_post_noor_tms_save_settings
 	 */
 	public function process_settings_form(): void {
-		if ( ! is_user_logged_in() || ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! is_user_logged_in() || ! noor_tms_can_manage() ) {
 			wp_die( esc_html__( 'You do not have permission to do this.', 'noor-tms' ) );
 		}
 
@@ -1049,6 +1053,7 @@ class PublicController {
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
 			'enrollment_date' => sanitize_text_field( $_POST['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
+			'gender'          => sanitize_key( $_POST['gender']          ?? 'male' ),
 			'status'          => sanitize_key( $_POST['status']                 ?? 'active' ),
 		];
 
@@ -1097,7 +1102,7 @@ class PublicController {
 	 * Process Fee Payment Form
 	 */
 	public function process_fee_payment_form(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( 'Unauthorized.' );
 		}
 
@@ -1125,7 +1130,7 @@ class PublicController {
 	 * Process Create / Update Fee Structure Form
 	 */
 	public function process_fee_structure_form(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( 'Unauthorized.' );
 		}
 
@@ -1161,7 +1166,7 @@ class PublicController {
 	 * Process Delete Fee Structure Form
 	 */
 	public function process_delete_fee_structure(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( 'Unauthorized.' );
 		}
 
@@ -1178,7 +1183,7 @@ class PublicController {
 	 * Process frontend manual trigger for generating missing invoices via cron logic.
 	 */
 	public function process_frontend_invoices_generation(): void {
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_die( 'Unauthorized.' );
 		}
 
@@ -1220,7 +1225,7 @@ class PublicController {
 			$msg = 'class_updated';
 		} else {
 			$new_class_id = DatabaseHandler::insert_class( $name, array_values( $subjects ) );
-			if ( $new_class_id && ! current_user_can( 'noor_tms_manage' ) && current_user_can( 'noor_tms_teacher' ) ) {
+			if ( $new_class_id && ! noor_tms_can_manage() && current_user_can( 'noor_tms_teacher' ) ) {
 				$teacher = DatabaseHandler::get_teacher_by_user( get_current_user_id() );
 				if ( $teacher ) {
 					$assignments = DatabaseHandler::get_teacher_assignments( (int) $teacher['id'] );
@@ -1280,7 +1285,7 @@ class PublicController {
 		$current_user_id = get_current_user_id();
 
 		if ( $thread_user_id > 0 ) {
-			if ( $thread_user_id === $current_user_id || current_user_can( 'noor_tms_manage' ) ) {
+			if ( $thread_user_id === $current_user_id || noor_tms_can_manage() ) {
 				return $thread;
 			}
 			return null;

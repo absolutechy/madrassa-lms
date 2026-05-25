@@ -166,7 +166,7 @@ final class Plugin {
 	 */
 	public function maybe_upgrade_database(): void {
 		$installed = (string) get_option( 'noor_tms_db_version', '1.0' );
-		if ( version_compare( $installed, '8.0', '<' ) ) {
+		if ( version_compare( $installed, '9.0', '<' ) ) {
 			DatabaseHandler::create_tables();
 		}
 	}

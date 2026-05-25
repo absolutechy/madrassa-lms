@@ -298,7 +298,7 @@ class Admin {
 	public function ajax_admin_chat_fetch(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( null, 403 );
 		}
 
@@ -333,7 +333,7 @@ class Admin {
 	public function ajax_admin_chat_reply(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( null, 403 );
 		}
 
@@ -373,7 +373,7 @@ class Admin {
 	public function ajax_admin_chat_ping(): void {
 		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
 
-		if ( ! current_user_can( 'noor_tms_manage' ) ) {
+		if ( ! noor_tms_can_manage() ) {
 			wp_send_json_error( null, 403 );
 		}
 

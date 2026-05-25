@@ -16,7 +16,7 @@
 defined( 'ABSPATH' ) || exit;
 
 $current_user = wp_get_current_user();
-$is_manager   = current_user_can( 'noor_tms_manage' );
+$is_manager   = noor_tms_can_manage();
 
 $nav_items = [];
 

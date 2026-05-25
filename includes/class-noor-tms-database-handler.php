@@ -34,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '8.0';
+	private const SCHEMA_VERSION = '9.0';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -82,6 +82,8 @@ class DatabaseHandler {
 			class_id        BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 			name            VARCHAR(255)        NOT NULL DEFAULT '',
 			parent_phone    VARCHAR(30)         NOT NULL DEFAULT '',
+			gender          VARCHAR(10)         NOT NULL DEFAULT 'male',
+			account_type    VARCHAR(10)         NOT NULL DEFAULT 'banin',
 			enrollment_date DATE                NOT NULL,
 			status          ENUM('active','inactive','graduated') NOT NULL DEFAULT 'active',
 			photo_id        BIGINT(20) UNSIGNED DEFAULT NULL,
@@ -90,6 +92,7 @@ class DatabaseHandler {
 			PRIMARY KEY  (id),
 			KEY idx_class_id (class_id),
 			KEY idx_status (status),
+			KEY idx_account_type (account_type),
 			KEY idx_enrollment_date (enrollment_date)
 		) {$charset_collate};";
 
@@ -417,7 +420,35 @@ class DatabaseHandler {
 			// phpcs:enable WordPress.DB.DirectDatabaseQuery
 		}
 
+		// v9.0: add student gender + account_type for banin/banaat segregation.
+		if ( version_compare( $installed, '9.0', '<' ) ) {
+			self::ensure_student_identity_columns();
+		}
+
+		// Always verify identity columns exist (guards against partial upgrades).
+		self::ensure_student_identity_columns();
+
 		update_option( self::SCHEMA_OPTION, self::SCHEMA_VERSION );
+	}
+
+	/**
+	 * Ensure the students table has gender/account_type and index.
+	 */
+	private static function ensure_student_identity_columns(): void {
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery
+		$cols = $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::students_table(), 0 );
+		if ( ! in_array( 'gender', $cols, true ) ) {
+			$wpdb->query( "ALTER TABLE " . self::students_table() . " ADD COLUMN gender VARCHAR(10) NOT NULL DEFAULT 'male' AFTER parent_phone" );
+		}
+		if ( ! in_array( 'account_type', $cols, true ) ) {
+			$wpdb->query( "ALTER TABLE " . self::students_table() . " ADD COLUMN account_type VARCHAR(10) NOT NULL DEFAULT 'banin' AFTER gender" );
+		}
+		$indexes = $wpdb->get_col( "SHOW INDEX FROM " . self::students_table() . " WHERE Key_name = 'idx_account_type'", 0 );
+		if ( empty( $indexes ) ) {
+			$wpdb->query( 'ALTER TABLE ' . self::students_table() . ' ADD KEY idx_account_type (account_type)' );
+		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
 	}
 
 	/**
@@ -1335,6 +1366,9 @@ class DatabaseHandler {
 
 	public static function assign_student_fee( int $student_id, int $fee_structure_id, string $academic_year ): int|false {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return false;
+		}
 		$inserted = $wpdb->insert(
 			self::student_fee_assignment_table(),
 			[
@@ -1375,24 +1409,55 @@ class DatabaseHandler {
 		];
 
 		$current_month = date('Y-m');
+		$scope         = self::get_account_type_scope();
 
-		// Total collected this month
-		$collected = $wpdb->get_var( "
-			SELECT SUM(paid_amount) 
-			FROM " . self::fee_payments_table() . " 
-			WHERE payment_date LIKE '{$current_month}%'
-		" );
-		$stats['total_collected'] = (float) $collected;
+		if ( $scope ) {
+			$collected = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT SUM(p.paid_amount)
+					 FROM " . self::fee_payments_table() . " p
+					 JOIN " . self::fee_invoices_table() . " i ON i.id = p.invoice_id
+					 JOIN " . self::students_table() . " s ON s.id = i.student_id
+					 WHERE p.payment_date LIKE %s AND s.account_type = %s",
+					$current_month . '%',
+					$scope
+				)
+			);
+			$stats['total_collected'] = (float) $collected;
 
-		// Stats for current month invoices
-		$invoices_stats = $wpdb->get_row( "
-			SELECT 
-				SUM(amount_due + fine - discount) as total_due,
-				SUM(CASE WHEN status IN ('unpaid', 'partial') THEN 1 ELSE 0 END) as unpaid_count,
-				SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count
-			FROM " . self::fee_invoices_table() . "
-			WHERE invoice_month = '{$current_month}' AND status != 'void'
-		", ARRAY_A );
+			$invoices_stats = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT
+						SUM(i.amount_due + i.fine - i.discount) as total_due,
+						SUM(CASE WHEN i.status IN ('unpaid', 'partial') THEN 1 ELSE 0 END) as unpaid_count,
+						SUM(CASE WHEN i.status = 'paid' THEN 1 ELSE 0 END) as paid_count
+					 FROM " . self::fee_invoices_table() . " i
+					 JOIN " . self::students_table() . " s ON s.id = i.student_id
+					 WHERE i.invoice_month = %s AND i.status != 'void' AND s.account_type = %s",
+					$current_month,
+					$scope
+				),
+				ARRAY_A
+			);
+		} else {
+			// Total collected this month
+			$collected = $wpdb->get_var( "
+				SELECT SUM(paid_amount)
+				FROM " . self::fee_payments_table() . "
+				WHERE payment_date LIKE '{$current_month}%'
+			" );
+			$stats['total_collected'] = (float) $collected;
+
+			// Stats for current month invoices
+			$invoices_stats = $wpdb->get_row( "
+				SELECT
+					SUM(amount_due + fine - discount) as total_due,
+					SUM(CASE WHEN status IN ('unpaid', 'partial') THEN 1 ELSE 0 END) as unpaid_count,
+					SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count
+				FROM " . self::fee_invoices_table() . "
+				WHERE invoice_month = '{$current_month}' AND status != 'void'
+			", ARRAY_A );
+		}
 
 		if ( $invoices_stats ) {
 			$stats['total_due']    = (float) $invoices_stats['total_due'];
@@ -1413,6 +1478,7 @@ class DatabaseHandler {
 		global $wpdb;
 
 		$where = ["i.status != 'void'"];
+		$scope = self::get_account_type_scope();
 
 		if ( ! empty( $args['month'] ) ) {
 			$where[] = $wpdb->prepare( "i.invoice_month = %s", $args['month'] );
@@ -1425,6 +1491,9 @@ class DatabaseHandler {
 		}
 		if ( ! empty( $args['student_id'] ) ) {
 			$where[] = $wpdb->prepare( "i.student_id = %d", (int) $args['student_id'] );
+		}
+		if ( $scope ) {
+			$where[] = $wpdb->prepare( "s.account_type = %s", $scope );
 		}
 
 		$where_sql = implode( ' AND ', $where );
@@ -1468,10 +1537,15 @@ class DatabaseHandler {
 
 		$where  = "i.status != 'void'";
 		$params = [];
+		$scope  = self::get_account_type_scope();
 
 		if ( ! empty( $args['search'] ) ) {
 			$where   .= ' AND s.name LIKE %s';
 			$params[] = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
+		}
+		if ( $scope ) {
+			$where   .= ' AND s.account_type = %s';
+			$params[] = $scope;
 		}
 
 		$count_sql = "SELECT COUNT(DISTINCT i.student_id) FROM {$inv} i JOIN {$stu} s ON i.student_id = s.id WHERE {$where}";
@@ -1532,10 +1606,15 @@ class DatabaseHandler {
 
 		$where  = "i.status IN ('unpaid','partial')";
 		$params = [];
+		$scope  = self::get_account_type_scope();
 
 		if ( ! empty( $args['search'] ) ) {
 			$where   .= ' AND s.name LIKE %s';
 			$params[] = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
+		}
+		if ( $scope ) {
+			$where   .= ' AND s.account_type = %s';
+			$params[] = $scope;
 		}
 
 		$count_sql = "SELECT COUNT(DISTINCT i.student_id) FROM {$inv} i JOIN {$stu} s ON i.student_id = s.id WHERE {$where}";
@@ -1579,6 +1658,9 @@ class DatabaseHandler {
 	 */
 	public static function get_unpaid_invoices_by_student( int $student_id ): array {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return [];
+		}
 		$query = $wpdb->prepare( "
 			SELECT 
 				i.*,
@@ -1602,6 +1684,17 @@ class DatabaseHandler {
 	 */
 	public static function get_student_fee_summary( int $student_id ): array {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return [
+				'total_due'     => 0.0,
+				'total_paid'    => 0.0,
+				'balance'       => 0.0,
+				'invoice_count' => 0,
+				'paid_count'    => 0,
+				'partial_count' => 0,
+				'unpaid_count'  => 0,
+			];
+		}
 
 		$payments_subquery = 'SELECT invoice_id, SUM(paid_amount) AS total_paid
 			FROM ' . self::fee_payments_table() . '
@@ -1657,8 +1750,16 @@ class DatabaseHandler {
 	 */
 	public static function get_defaulters(): array {
 		global $wpdb;
+		$scope  = self::get_account_type_scope();
+		$where  = [ "i.status IN ('unpaid', 'partial')" ];
+		$params = [];
+		if ( $scope ) {
+			$where[]  = 's.account_type = %s';
+			$params[] = $scope;
+		}
+		$where_sql = implode( ' AND ', $where );
 		
-		$query = $wpdb->prepare( "
+		$query = "
 			SELECT 
 				s.id AS student_id,
 				s.name AS student_name,
@@ -1676,10 +1777,11 @@ class DatabaseHandler {
 			JOIN " . self::students_table() . " s ON i.student_id = s.id
 			LEFT JOIN " . self::classes_table() . " c ON s.class_id = c.id
 			LEFT JOIN " . self::fee_payments_table() . " p ON i.id = p.invoice_id
-			WHERE i.status IN ('unpaid', 'partial')
+			WHERE {$where_sql}
 			GROUP BY i.id
 			ORDER BY c.name ASC, s.name ASC, i.invoice_month ASC
-		" );
+		";
+		$query = $params ? $wpdb->prepare( $query, ...$params ) : $query;
 		
 		$results = $wpdb->get_results( $query, ARRAY_A );
 		return $results ?: [];
@@ -1864,6 +1966,75 @@ class DatabaseHandler {
 	// -----------------------------------------------------------------------
 
 	/**
+	 * Return account_type scope for current user.
+	 *
+	 * @return string|null 'banin' | 'banaat' | null (no restriction)
+	 */
+	private static function get_account_type_scope(): ?string {
+		$can_banin  = current_user_can( 'manage_banin' );
+		$can_banaat = current_user_can( 'manage_banaat' );
+		if ( $can_banin && ! $can_banaat ) {
+			return 'banin';
+		}
+		if ( $can_banaat && ! $can_banin ) {
+			return 'banaat';
+		}
+		return null;
+	}
+
+	/**
+	 * Append account_type filter for queries that join students table.
+	 *
+	 * @param array  $where  SQL where fragments.
+	 * @param array  $params Prepared statement params.
+	 * @param string $alias  Students table alias used in SQL.
+	 */
+	private static function add_account_type_filter( array &$where, array &$params, string $alias = 'st' ): void {
+		$scope = self::get_account_type_scope();
+		if ( $scope ) {
+			$where[]  = $alias . '.account_type = %s';
+			$params[] = $scope;
+		}
+	}
+
+	/**
+	 * Validate account_type access for a single student ID.
+	 */
+	private static function can_access_student_id( int $student_id ): bool {
+		$scope = self::get_account_type_scope();
+		if ( ! $scope || $student_id <= 0 ) {
+			return true;
+		}
+		global $wpdb;
+		$type = $wpdb->get_var(
+			$wpdb->prepare( 'SELECT account_type FROM ' . self::students_table() . ' WHERE id = %d', $student_id )
+		);
+		return $type === $scope;
+	}
+
+	/**
+	 * Normalize and enforce gender/account_type, respecting current scope.
+	 *
+	 * @return array{gender: string, account_type: string}
+	 */
+	private static function normalize_student_identity( array $data ): array {
+		$scope  = self::get_account_type_scope();
+		$gender = sanitize_key( (string) ( $data['gender'] ?? '' ) );
+		$gender = in_array( $gender, [ 'male', 'female' ], true ) ? $gender : 'male';
+		if ( $scope ) {
+			return [
+				'gender'       => ( 'banaat' === $scope ) ? 'female' : 'male',
+				'account_type' => $scope,
+			];
+		}
+		$account_type = ( 'female' === $gender ) ? 'banaat' : 'banin';
+		return [
+			'gender'       => $gender,
+			'account_type' => $account_type,
+		];
+	}
+
+	/**
 	 * Insert a new student record.
 	 *
 	 * @param array<string, mixed> $data
@@ -1871,16 +2042,51 @@ class DatabaseHandler {
 	 */
 	public static function insert_student( array $data ): int|false {
 		global $wpdb;
+		$identity = self::normalize_student_identity( $data );
 		$row = [
 			'class_id'        => (int) ( $data['class_id'] ?? 0 ),
 			'name'            => sanitize_text_field( $data['name'] ?? '' ),
 			'parent_phone'    => sanitize_text_field( $data['parent_phone'] ?? '' ),
+			'gender'          => $identity['gender'],
+			'account_type'    => $identity['account_type'],
 			'enrollment_date' => sanitize_text_field( $data['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
 			'status'          => in_array( $data['status'] ?? 'active', [ 'active', 'inactive', 'graduated' ], true )
 								? $data['status']
 								: 'active',
 		];
-		$formats = [ '%d', '%s', '%s', '%s', '%s' ];
+		$formats = [ '%d', '%s', '%s', '%s', '%s', '%s', '%s' ];
+
+		// Legacy: auto-assign per-account serials if the columns exist.
+		$cols = $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::students_table(), 0 ); // phpcs:ignore
+		$has_serial_no     = in_array( 'serial_no', $cols, true );
+		$has_serial_number = in_array( 'serial_number', $cols, true );
+		$has_serial_pa     = in_array( 'serial_per_account', $cols, true );
+		if ( $has_serial_no || $has_serial_number || $has_serial_pa ) {
+			$next_serial = 1;
+			if ( $has_serial_no || $has_serial_number ) {
+				$serial_col = $has_serial_no ? 'serial_no' : 'serial_number';
+				$next_serial = (int) $wpdb->get_var( // phpcs:ignore
+					$wpdb->prepare(
+						'SELECT COALESCE(MAX(' . $serial_col . '), 0) + 1 FROM ' . self::students_table() . ' WHERE account_type = %s',
+						$identity['account_type']
+					)
+				);
+				$row[ $serial_col ] = $next_serial;
+				$formats[]          = '%d';
+			}
+			if ( $has_serial_pa ) {
+				$like = $identity['account_type'] . '-%';
+				$next_serial = (int) $wpdb->get_var( // phpcs:ignore
+					$wpdb->prepare(
+						"SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(serial_per_account, '-', -1) AS UNSIGNED)), 0) + 1
+						 FROM " . self::students_table() . " WHERE serial_per_account LIKE %s",
+						$like
+					)
+				);
+				$row['serial_per_account'] = $identity['account_type'] . '-' . $next_serial;
+				$formats[]                 = '%s';
+			}
+		}
 		if ( ! empty( $data['photo_id'] ) ) {
 			$row['photo_id']  = (int) $data['photo_id'];
 			$formats[]        = '%d';
@@ -1926,6 +2132,11 @@ class DatabaseHandler {
 			$where   .= ' AND st.class_id = %d';
 			$params[] = (int) $args['class_id'];
 		}
+		$scope = self::get_account_type_scope();
+		if ( $scope ) {
+			$where   .= ' AND st.account_type = %s';
+			$params[] = $scope;
+		}
 
 		// Total count.
 		$count_sql = "SELECT COUNT(*) FROM {$st} st WHERE {$where}";
@@ -1957,6 +2168,9 @@ class DatabaseHandler {
 	 */
 	public static function get_student( int $id ): ?array {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $id ) ) {
+			return null;
+		}
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				'SELECT st.*, cl.name AS class_name
@@ -1979,16 +2193,22 @@ class DatabaseHandler {
 	 */
 	public static function update_student( int $id, array $data ): bool {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $id ) ) {
+			return false;
+		}
+		$identity = self::normalize_student_identity( $data );
 		$row = [
 			'class_id'        => (int) ( $data['class_id'] ?? 0 ),
 			'name'            => sanitize_text_field( $data['name'] ?? '' ),
 			'parent_phone'    => sanitize_text_field( $data['parent_phone'] ?? '' ),
+			'gender'          => $identity['gender'],
+			'account_type'    => $identity['account_type'],
 			'enrollment_date' => sanitize_text_field( $data['enrollment_date'] ?? current_time( 'Y-m-d' ) ),
 			'status'          => in_array( $data['status'] ?? 'active', [ 'active', 'inactive', 'graduated' ], true )
 								? $data['status']
 								: 'active',
 		];
-		$formats = [ '%d', '%s', '%s', '%s', '%s' ];
+		$formats = [ '%d', '%s', '%s', '%s', '%s', '%s', '%s' ];
 		if ( array_key_exists( 'photo_id', $data ) ) {
 			$row['photo_id'] = $data['photo_id'] ? (int) $data['photo_id'] : null;
 			$formats[]       = $data['photo_id'] ? '%d' : null;
@@ -2005,6 +2225,9 @@ class DatabaseHandler {
 	 */
 	public static function delete_student( int $id ): bool {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $id ) ) {
+			return false;
+		}
 		// Clean up WP media attachment if a photo was stored.
 		$photo_id = (int) $wpdb->get_var(
 			$wpdb->prepare( 'SELECT photo_id FROM ' . self::students_table() . ' WHERE id = %d', $id )
@@ -2026,14 +2249,12 @@ class DatabaseHandler {
 	 */
 	public static function get_students_by_class( int $class_id ): array {
 		global $wpdb;
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT id, name, class_id, parent_phone, status FROM " . self::students_table()
-				. " WHERE class_id = %d AND status = 'active' ORDER BY name ASC",
-				$class_id
-			),
-			ARRAY_A
-		);
+		$where  = [ 'class_id = %d', "status = 'active'" ];
+		$params = [ $class_id ];
+		self::add_account_type_filter( $where, $params, 's' );
+		$sql  = "SELECT id, name, class_id, parent_phone, status FROM " . self::students_table() . " s";
+		$sql .= ' WHERE ' . implode( ' AND ', $where ) . ' ORDER BY name ASC';
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
 		return $rows ?: [];
 	}
 
@@ -2045,20 +2266,17 @@ class DatabaseHandler {
 	 */
 	public static function get_students_dropdown( int $class_id = 0 ): array {
 		global $wpdb;
+		$where  = [ "status = 'active'" ];
+		$params = [];
 		if ( $class_id > 0 ) {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT id, name FROM " . self::students_table() . " WHERE status = 'active' AND class_id = %d ORDER BY name ASC",
-					$class_id
-				),
-				ARRAY_A
-			);
-		} else {
-			$rows = $wpdb->get_results(
-				"SELECT id, name FROM " . self::students_table() . " WHERE status = 'active' ORDER BY name ASC",
-				ARRAY_A
-			);
+			$where[]  = 'class_id = %d';
+			$params[] = $class_id;
 		}
+		self::add_account_type_filter( $where, $params, 's' );
+		$sql = "SELECT id, name FROM " . self::students_table() . " s WHERE " . implode( ' AND ', $where ) . ' ORDER BY name ASC';
+		$rows = $params
+			? $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A )
+			: $wpdb->get_results( $sql, ARRAY_A );
 		return $rows ?: [];
 	}
 
@@ -2074,10 +2292,14 @@ class DatabaseHandler {
 	 */
 	public static function insert_result( array $data ): int|false {
 		global $wpdb;
+		$student_id = (int) ( $data['student_id'] ?? 0 );
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return false;
+		}
 		$inserted = $wpdb->insert(
 			self::results_table(),
 			[
-				'student_id'     => (int)   ( $data['student_id']     ?? 0 ),
+				'student_id'     => $student_id,
 				'subject'        => sanitize_text_field( $data['subject'] ?? '' ),
 				'marks_obtained' => (float) ( $data['marks_obtained'] ?? 0 ),
 				'total_marks'    => (float) ( $data['total_marks']    ?? 100 ),
@@ -2134,6 +2356,11 @@ class DatabaseHandler {
 			$where   .= ' AND r.student_id = %d';
 			$params[] = (int) $args['student_id'];
 		}
+		$scope = self::get_account_type_scope();
+		if ( $scope ) {
+			$where   .= ' AND st.account_type = %s';
+			$params[] = $scope;
+		}
 
 		$count_sql = "SELECT COUNT(*) FROM {$r} r JOIN {$st} st ON st.id = r.student_id WHERE {$where}";
 		$total     = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, ...$params ) ); // phpcs:ignore
@@ -2161,6 +2388,9 @@ class DatabaseHandler {
 	 */
 	public static function get_results_by_student( int $student_id ): array {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return [];
+		}
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT r.*, st.name AS student_name, st.parent_phone
@@ -2195,25 +2425,32 @@ class DatabaseHandler {
 	public static function get_results_summary_by_class( int $class_id, string $exam_date = '' ): array {
 		global $wpdb;
 
-		$query = 'SELECT r.student_id,
-				        st.name              AS student_name,
-				        st.parent_phone,
-				        r.subject,
-				        SUM(r.marks_obtained) AS obtained,
-				        SUM(r.total_marks)    AS total_marks,
-				        MAX(r.exam_date)      AS exam_date
-				   FROM ' . self::results_table() . ' r
-				   JOIN ' . self::students_table() . ' st ON st.id = r.student_id
-				  WHERE st.class_id = %d';
-
+		$where  = [ 'st.class_id = %d' ];
+		$params = [ $class_id ];
 		if ( ! empty( $exam_date ) ) {
-			$query .= ' AND r.exam_date = %s';
-			$query .= ' GROUP BY r.student_id, r.subject ORDER BY st.name ASC, r.subject ASC';
-			$sql = $wpdb->prepare( $query, $class_id, $exam_date );
-		} else {
-			$query .= ' GROUP BY r.student_id, r.subject ORDER BY st.name ASC, r.subject ASC';
-			$sql = $wpdb->prepare( $query, $class_id );
+			$where[]  = 'r.exam_date = %s';
+			$params[] = $exam_date;
 		}
+		$scope = self::get_account_type_scope();
+		if ( $scope ) {
+			$where   .= ' AND st.account_type = %s';
+			$params[] = $scope;
+		}
+
+		$query = 'SELECT r.student_id,
+			        st.name              AS student_name,
+			        st.parent_phone,
+			        r.subject,
+			        SUM(r.marks_obtained) AS obtained,
+			        SUM(r.total_marks)    AS total_marks,
+			        MAX(r.exam_date)      AS exam_date
+		   FROM ' . self::results_table() . ' r
+		   JOIN ' . self::students_table() . ' st ON st.id = r.student_id
+		  WHERE ' . implode( ' AND ', $where ) . '
+		  GROUP BY r.student_id, r.subject
+		  ORDER BY st.name ASC, r.subject ASC';
+
+		$sql = $wpdb->prepare( $query, ...$params );
 
 		$rows = $wpdb->get_results( $sql, ARRAY_A );
 
@@ -2254,17 +2491,20 @@ class DatabaseHandler {
 	 */
 	public static function get_exam_dates_by_class( int $class_id ): array {
 		global $wpdb;
+		$where  = [ 'st.class_id = %d' ];
+		$params = [ $class_id ];
+		self::add_account_type_filter( $where, $params, 'st' );
 
 		$sql = "
 			SELECT r.exam_date, COUNT(r.id) AS results_count
 			  FROM " . self::results_table() . " r
 			  JOIN " . self::students_table() . " st ON st.id = r.student_id
-			 WHERE st.class_id = %d
+			 WHERE " . implode( ' AND ', $where ) . "
 			 GROUP BY r.exam_date
 			 ORDER BY r.exam_date DESC
 		";
 
-		$results = $wpdb->get_results( $wpdb->prepare( $sql, $class_id ), ARRAY_A );
+		$results = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
 
 		return $results ?: [];
 	}
@@ -2587,6 +2827,9 @@ class DatabaseHandler {
 		string $time_slot = 'morning'
 	): bool {
 		global $wpdb;
+		if ( ! self::can_access_student_id( $student_id ) ) {
+			return false;
+		}
 		$allowed   = [ 'present', 'absent', 'late', 'excused' ];
 		$slots     = [ 'morning', 'afternoon', 'evening', 'night' ];
 		$status    = in_array( $status, $allowed, true ) ? $status : 'present';
@@ -2669,24 +2912,39 @@ class DatabaseHandler {
 	 */
 	public static function get_student_attendance_for_date( int $class_id, string $date, string $time_slot = 'morning' ): array {
 		global $wpdb;
+		$scope = self::get_account_type_scope();
 		if ( $class_id ) {
-			$rows = $wpdb->get_results( // phpcs:ignore
-				$wpdb->prepare(
-					'SELECT student_id, status FROM ' . self::student_attendance_table() .
-					' WHERE class_id = %d AND att_date = %s AND time_slot = %s',
-					$class_id, $date, $time_slot
-				),
-				ARRAY_A
-			);
+			if ( $scope ) {
+				$sql = 'SELECT a.student_id, a.status FROM ' . self::student_attendance_table() . ' a'
+					. ' JOIN ' . self::students_table() . ' st ON st.id = a.student_id'
+					. ' WHERE a.class_id = %d AND a.att_date = %s AND a.time_slot = %s AND st.account_type = %s';
+				$rows = $wpdb->get_results( $wpdb->prepare( $sql, $class_id, $date, $time_slot, $scope ), ARRAY_A );
+			} else {
+				$rows = $wpdb->get_results( // phpcs:ignore
+					$wpdb->prepare(
+						'\tSELECT student_id, status FROM ' . self::student_attendance_table() .
+						' WHERE class_id = %d AND att_date = %s AND time_slot = %s',
+						$class_id, $date, $time_slot
+					),
+					ARRAY_A
+				);
+			}
 		} else {
-			$rows = $wpdb->get_results( // phpcs:ignore
-				$wpdb->prepare(
-					'SELECT student_id, status FROM ' . self::student_attendance_table() .
-					' WHERE att_date = %s AND time_slot = %s',
-					$date, $time_slot
-				),
-				ARRAY_A
-			);
+			if ( $scope ) {
+				$sql = 'SELECT a.student_id, a.status FROM ' . self::student_attendance_table() . ' a'
+					. ' JOIN ' . self::students_table() . ' st ON st.id = a.student_id'
+					. ' WHERE a.att_date = %s AND a.time_slot = %s AND st.account_type = %s';
+				$rows = $wpdb->get_results( $wpdb->prepare( $sql, $date, $time_slot, $scope ), ARRAY_A );
+			} else {
+				$rows = $wpdb->get_results( // phpcs:ignore
+					$wpdb->prepare(
+						'\tSELECT student_id, status FROM ' . self::student_attendance_table() .
+						' WHERE att_date = %s AND time_slot = %s',
+						$date, $time_slot
+					),
+					ARRAY_A
+				);
+			}
 		}
 		$map = [];
 		foreach ( $rows ?: [] as $row ) {
@@ -2703,14 +2961,17 @@ class DatabaseHandler {
 	 */
 	public static function get_all_active_students(): array {
 		global $wpdb;
-		return $wpdb->get_results( // phpcs:ignore
-			"SELECT s.id, s.name, s.class_id, c.name AS class_name
-			   FROM " . self::students_table() . " s
-			   LEFT JOIN " . self::classes_table() . " c ON c.id = s.class_id
-			  WHERE s.status = 'active'
-			  ORDER BY c.name ASC, s.name ASC",
-			ARRAY_A
-		) ?: [];
+		$where  = [ "s.status = 'active'" ];
+		$params = [];
+		self::add_account_type_filter( $where, $params, 's' );
+		$sql = "SELECT s.id, s.name, s.class_id, c.name AS class_name
+		   FROM " . self::students_table() . " s
+		   LEFT JOIN " . self::classes_table() . " c ON c.id = s.class_id
+		  WHERE " . implode( ' AND ', $where ) . "
+		  ORDER BY c.name ASC, s.name ASC";
+		return $params
+			? $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A )
+			: $wpdb->get_results( $sql, ARRAY_A );
 	}
 
 	/**
@@ -2751,6 +3012,7 @@ class DatabaseHandler {
 			$where[]  = 'st.name LIKE %s';
 			$values[] = '%' . $wpdb->esc_like( sanitize_text_field( $filters['student_search'] ) ) . '%';
 		}
+		self::add_account_type_filter( $where, $values, 'st' );
 
 		$where_sql = implode( ' AND ', $where );
 		$offset    = ( max( 1, $page ) - 1 ) * $per_page;
@@ -2818,6 +3080,9 @@ class DatabaseHandler {
 		if ( ! $row ) {
 			return false;
 		}
+		if ( ! self::can_access_student_id( (int) $row['student_id'] ) ) {
+			return false;
+		}
 
 		$old_status = $row['status'];
 
@@ -2875,6 +3140,7 @@ class DatabaseHandler {
 			$where[]  = 'al.att_date <= %s';
 			$values[] = sanitize_text_field( $filters['date_to'] );
 		}
+		self::add_account_type_filter( $where, $values, 'st' );
 
 		$limit     = (int) ( $filters['limit'] ?? 100 );
 		$where_sql = implode( ' AND ', $where );
@@ -2917,51 +3183,31 @@ class DatabaseHandler {
 		$from = sprintf( '%04d-%02d-01', $year, $month );
 		$to   = date( 'Y-m-t', mktime( 0, 0, 0, $month, 1, $year ) );
 
+		$where  = [ 'a.att_date BETWEEN %s AND %s' ];
+		$params = [ $from, $to ];
 		if ( $class_id ) {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT a.student_id,
-							st.name AS student_name,
-							c.name  AS class_name,
-							SUM(a.status = 'present') AS present,
-							SUM(a.status = 'absent')  AS absent,
-							SUM(a.status = 'late')    AS late,
-							SUM(a.status = 'excused') AS excused,
-							COUNT(*) AS total_days,
-							GROUP_CONCAT(CONCAT(a.att_date, ':', a.status) SEPARATOR ',') AS daily_records
-					   FROM " . self::student_attendance_table() . " a
-					   JOIN " . self::students_table() . " st ON st.id = a.student_id
-					   JOIN " . self::classes_table() . " c  ON c.id  = a.class_id
-					  WHERE a.class_id = %d AND a.att_date BETWEEN %s AND %s
-					  GROUP BY a.student_id
-					  ORDER BY st.name ASC",
-					$class_id, $from, $to
-				),
-				ARRAY_A
-			);
-		} else {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT a.student_id,
-							st.name AS student_name,
-							c.name  AS class_name,
-							SUM(a.status = 'present') AS present,
-							SUM(a.status = 'absent')  AS absent,
-							SUM(a.status = 'late')    AS late,
-							SUM(a.status = 'excused') AS excused,
-							COUNT(*) AS total_days,
-							GROUP_CONCAT(CONCAT(a.att_date, ':', a.status) SEPARATOR ',') AS daily_records
-					   FROM " . self::student_attendance_table() . " a
-					   JOIN " . self::students_table() . " st ON st.id = a.student_id
-					   JOIN " . self::classes_table() . " c  ON c.id  = a.class_id
-					  WHERE a.att_date BETWEEN %s AND %s
-					  GROUP BY a.student_id
-					  ORDER BY st.name ASC",
-					$from, $to
-				),
-				ARRAY_A
-			);
+			$where[]  = 'a.class_id = %d';
+			$params[] = $class_id;
 		}
+		self::add_account_type_filter( $where, $params, 'st' );
+		$where_sql = implode( ' AND ', $where );
+
+		$sql = "SELECT a.student_id,
+					st.name AS student_name,
+					c.name  AS class_name,
+					SUM(a.status = 'present') AS present,
+					SUM(a.status = 'absent')  AS absent,
+					SUM(a.status = 'late')    AS late,
+					SUM(a.status = 'excused') AS excused,
+					COUNT(*) AS total_days,
+					GROUP_CONCAT(CONCAT(a.att_date, ':', a.status) SEPARATOR ',') AS daily_records
+				   FROM " . self::student_attendance_table() . " a
+				   JOIN " . self::students_table() . " st ON st.id = a.student_id
+				   JOIN " . self::classes_table() . " c  ON c.id  = a.class_id
+				  WHERE {$where_sql}
+				  GROUP BY a.student_id
+				  ORDER BY st.name ASC";
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
 
 		$summary = [];
 		foreach ( $rows ?: [] as $row ) {
