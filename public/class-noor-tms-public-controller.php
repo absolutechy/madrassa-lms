@@ -1053,7 +1053,7 @@ class PublicController {
 		}
 
 		$data = [
-			'class_id'        => (int) ( $_POST['class_id']        ?? 0 ),
+			'class_id'        => 0,
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
 			'category_id'     => (int) ( $_POST['category_id']     ?? 0 ),

@@ -234,7 +234,6 @@ class Students {
 			return;
 		}
 
-		$classes = DatabaseHandler::get_classes_dropdown();
 		$all_categories = DatabaseHandler::get_categories();
 		$parent_categories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] === 0 ) );
 		$subcategories = array_values( array_filter( $all_categories, fn( $c ) => (int) $c['parent_id'] > 0 ) );
@@ -261,34 +260,6 @@ class Students {
 								<input type="text" id="name" name="name" required
 									value="<?php echo esc_attr( $student['name'] ?? '' ); ?>"
 									class="regular-text" />
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">
-								<label for="class_id"><?php esc_html_e( 'Class', 'noor-tms' ); ?></label>
-							</th>
-							<td>
-								<?php if ( empty( $classes ) ) : ?>
-									<p class="description">
-										<?php
-										printf(
-											/* translators: %s: link to create class */
-											esc_html__( 'No classes found. %s first.', 'noor-tms' ),
-											'<a href="' . esc_url( add_query_arg( [ 'page' => 'noor-tms-classes', 'action' => 'new' ], admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Create a class', 'noor-tms' ) . '</a>'
-										);
-										?>
-									</p>
-								<?php else : ?>
-									<select id="class_id" name="class_id" class="regular-text">
-										<option value="0"><?php esc_html_e( '— No Class —', 'noor-tms' ); ?></option>
-										<?php foreach ( $classes as $cls ) : ?>
-											<option value="<?php echo esc_attr( $cls['id'] ); ?>"
-												<?php selected( (int) ( $student['class_id'] ?? 0 ), (int) $cls['id'] ); ?>>
-												<?php echo esc_html( $cls['name'] ); ?>
-											</option>
-										<?php endforeach; ?>
-									</select>
-								<?php endif; ?>
 							</td>
 						</tr>
 						<tr>
@@ -459,7 +430,7 @@ class Students {
 		}
 
 		$data = [
-			'class_id'        => (int) ( $_POST['class_id'] ?? 0 ),
+			'class_id'        => 0,
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
 			'category_id'     => (int) ( $_POST['category_id']     ?? 0 ),

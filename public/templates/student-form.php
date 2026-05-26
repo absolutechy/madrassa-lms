@@ -65,69 +65,45 @@ include __DIR__ . '/layout.php';
 
 		<div class="noor-form-row">
 			<div class="noor-form-group">
-				<label for="class_id"><?php esc_html_e( 'Class', 'noor-tms' ); ?></label>
-				<?php if ( empty( $classes ) ) : ?>
-					<p class="noor-form-description">
-						<?php
-						printf(
-							/* translators: %s: link to create class */
-							esc_html__( 'No classes found. %s first.', 'noor-tms' ),
-							'<a href="' . esc_url( add_query_arg( 'tms_action', 'new', home_url( '/tms-classes/' ) ) ) . '">'
-							. esc_html__( 'Create a class', 'noor-tms' ) . '</a>'
-						);
-						?>
-					</p>
-
-					<div class="noor-form-group">
-						<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
-						<?php if ( empty( $parent_categories ) ) : ?>
-							<p class="noor-form-description"><?php esc_html_e( 'No categories found yet.', 'noor-tms' ); ?></p>
-						<?php else : ?>
-							<select id="category_id" name="category_id">
-								<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
-								<?php foreach ( $parent_categories as $cat ) : ?>
-									<?php
-									$label = $cat['name'];
-									if ( $has_mixed_category_types ) {
-										$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
-										$label = $type_label . ' - ' . $label;
-									}
-									?>
-									<option value="<?php echo esc_attr( $cat['id'] ); ?>" <?php selected( (int) ( $student['category_id'] ?? 0 ), (int) $cat['id'] ); ?>>
-										<?php echo esc_html( $label ); ?>
-									</option>
-								<?php endforeach; ?>
-							</select>
-						<?php endif; ?>
-					</div>
+				<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
+				<?php if ( empty( $parent_categories ) ) : ?>
+					<p class="noor-form-description"><?php esc_html_e( 'No categories found yet.', 'noor-tms' ); ?></p>
 				<?php else : ?>
-					<select id="class_id" name="class_id">
-						<option value="0"><?php esc_html_e( '— No Class —', 'noor-tms' ); ?></option>
-					<div class="noor-form-group">
-						<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
-						<select id="subcategory_id" name="subcategory_id">
-							<option value="0"><?php esc_html_e( '— Select Sub-Category —', 'noor-tms' ); ?></option>
-							<?php foreach ( $subcategories as $subcat ) : ?>
-								<option value="<?php echo esc_attr( $subcat['id'] ); ?>"
-									data-parent="<?php echo esc_attr( $subcat['parent_id'] ); ?>"
-									<?php selected( (int) ( $student['subcategory_id'] ?? 0 ), (int) $subcat['id'] ); ?>>
-									<?php echo esc_html( $subcat['name'] ); ?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-						<p class="noor-form-description"><?php esc_html_e( 'Optional. Choose a sub-category under the selected category.', 'noor-tms' ); ?></p>
-					</div>
-
-						<?php foreach ( $classes as $cls ) : ?>
-							<option value="<?php echo esc_attr( $cls['id'] ); ?>"
-								<?php selected( (int) ( $student['class_id'] ?? 0 ), (int) $cls['id'] ); ?>>
-								<?php echo esc_html( $cls['name'] ); ?>
+					<select id="category_id" name="category_id">
+						<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
+						<?php foreach ( $parent_categories as $cat ) : ?>
+							<?php
+							$label = $cat['name'];
+							if ( $has_mixed_category_types ) {
+								$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
+								$label = $type_label . ' - ' . $label;
+							}
+							?>
+							<option value="<?php echo esc_attr( $cat['id'] ); ?>" <?php selected( (int) ( $student['category_id'] ?? 0 ), (int) $cat['id'] ); ?>>
+								<?php echo esc_html( $label ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
 				<?php endif; ?>
 			</div>
 
+			<div class="noor-form-group">
+				<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
+				<select id="subcategory_id" name="subcategory_id">
+					<option value="0"><?php esc_html_e( '— Select Sub-Category —', 'noor-tms' ); ?></option>
+					<?php foreach ( $subcategories as $subcat ) : ?>
+						<option value="<?php echo esc_attr( $subcat['id'] ); ?>"
+							data-parent="<?php echo esc_attr( $subcat['parent_id'] ); ?>"
+							<?php selected( (int) ( $student['subcategory_id'] ?? 0 ), (int) $subcat['id'] ); ?>>
+							<?php echo esc_html( $subcat['name'] ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<p class="noor-form-description"><?php esc_html_e( 'Optional. Choose a sub-category under the selected category.', 'noor-tms' ); ?></p>
+			</div>
+		</div>
+
+		<div class="noor-form-row">
 			<div class="noor-form-group">
 				<label for="enrollment_date"><?php esc_html_e( 'Enrollment Date', 'noor-tms' ); ?></label>
 				<input type="date" id="enrollment_date" name="enrollment_date"
