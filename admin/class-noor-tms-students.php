@@ -589,11 +589,11 @@ class Students {
 			__( 'Serial Number', 'noor-tms' )   => $student['serial_number'] ?? null,
 			__( 'Full Name', 'noor-tms' )       => $student['name'] ?? '',
 			__( "Father's Name", 'noor-tms' )   => $student['father_name'] ?? null,
-			__( 'Parent Phone', 'noor-tms' )    => $student['parent_phone'] ?? '',
+			'والدین کا فون نمبر'                => $student['parent_phone'] ?? '',
 			__( 'Gender', 'noor-tms' )          => ! empty( $student['gender'] ) ? ucfirst( (string) $student['gender'] ) : null,
-			__( 'Account', 'noor-tms' )         => ! empty( $student['account_type'] ) ? ucfirst( (string) $student['account_type'] ) : null,
+			'اکاؤنٹ'                            => ! empty( $student['account_type'] ) ? ucfirst( (string) $student['account_type'] ) : null,
 			__( 'Category', 'noor-tms' )        => $category['name'] ?? ( $student['category'] ?? null ),
-			__( 'Sub-category', 'noor-tms' )    => $subcategory['name'] ?? null,
+			'ذیلی درجہ'                         => $subcategory['name'] ?? null,
 			__( 'Class', 'noor-tms' )           => $student['class_name'] ?? __( 'Unassigned', 'noor-tms' ),
 			__( 'Date of Birth', 'noor-tms' )   => $student['dob'] ?? null,
 			__( 'Enrollment Date', 'noor-tms' ) => $student['enrollment_date'] ?? '',
@@ -748,6 +748,7 @@ class Students {
 					color: var(--noor-muted);
 					font-size: var(--noor-min-font-size);
 					line-height: 1.6;
+					text-align: right;
 				}
 
 				.report-title {
@@ -891,13 +892,13 @@ class Students {
 
 				<div class="report-paper">
 					<header class="report-header">
-						<div class="institute-contact">
-							<div><strong><?php esc_html_e( 'Institute Email:', 'noor-tms' ); ?></strong> info@ibneabbas.com</div>
-							<div><strong><?php esc_html_e( 'Contact Num:', 'noor-tms' ); ?></strong> 033398234444</div>
-							<div><strong><?php esc_html_e( 'Address:', 'noor-tms' ); ?></strong> Dummy address for now</div>
-						</div>
 						<div>
 							<h1 class="institute-name" lang="ur" dir="rtl">جامعہ عبداللہ ابن عباس</h1>
+						</div>
+						<div class="institute-contact">
+							<div><strong>ای میل:</strong> info@ibneabbas.com</div>
+							<div><strong>رابطہ نمبر:</strong> 033398234444</div>
+							<div><strong>پتہ:</strong> Dummy address for now</div>
 						</div>
 					</header>
 
