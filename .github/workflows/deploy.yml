@@ -3,7 +3,7 @@ name: Deploy WordPress Plugin
 on:
   push:
     branches:
-      - main  # Deploy only when pushing to main
+      - main
 
 jobs:
   deploy:
