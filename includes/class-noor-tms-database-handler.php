@@ -34,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 class DatabaseHandler {
 
 	/** Current schema version – bump when ALTER TABLE migrations are needed. */
-	private const SCHEMA_VERSION = '10.0';
+	private const SCHEMA_VERSION = '10.1';
 	private const SCHEMA_OPTION  = 'noor_tms_db_version';
 
 	// -----------------------------------------------------------------------
@@ -58,9 +58,15 @@ class DatabaseHandler {
 		$sql_classes = "CREATE TABLE " . self::classes_table() . " (
 			id         BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			name       VARCHAR(255)        NOT NULL DEFAULT '',
+			account_type VARCHAR(10)       NOT NULL DEFAULT 'banin',
+			category_id    BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+			subcategory_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 			created_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
-			KEY idx_name (name)
+			KEY idx_name (name),
+			KEY idx_account_type (account_type),
+			KEY idx_category_id (category_id),
+			KEY idx_subcategory_id (subcategory_id)
 		) {$charset_collate};";
 
 		// ----------------------------------------------------------------
@@ -82,6 +88,10 @@ class DatabaseHandler {
 			name         VARCHAR(255)        NOT NULL DEFAULT '',
 			parent_id    BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
 			account_type VARCHAR(10)         NOT NULL DEFAULT 'banin',
+			is_school_type TINYINT(1)        NOT NULL DEFAULT 0,
+			is_active    TINYINT(1)          NOT NULL DEFAULT 1,
+			max_marks    DECIMAL(8,2)        NOT NULL DEFAULT 0.00,
+			pass_marks   DECIMAL(8,2)        NOT NULL DEFAULT 0.00,
 			description  TEXT,
 			sort_order   SMALLINT(5) UNSIGNED NOT NULL DEFAULT 0,
 			created_at   DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1311,12 +1321,25 @@ class DatabaseHandler {
 	 * @param string[] $subjects  Array of subject name strings.
 	 * @return int|false  New class ID or false on failure.
 	 */
-	public static function insert_class( string $name, array $subjects = [] ): int|false {
+	public static function insert_class( string $name, array $subjects = [], array $data = [] ): int|false {
 		global $wpdb;
+		$scope = self::get_account_type_scope();
+		$account_type = sanitize_key( (string) ( $data['account_type'] ?? $scope ?? 'banin' ) );
+		if ( ! in_array( $account_type, [ 'banin', 'banaat' ], true ) ) {
+			$account_type = 'banin';
+		}
+		if ( $scope ) {
+			$account_type = $scope;
+		}
 		$inserted = $wpdb->insert(
 			self::classes_table(),
-			[ 'name' => sanitize_text_field( $name ) ],
-			[ '%s' ]
+			[
+				'name'           => sanitize_text_field( $name ),
+				'account_type'    => $account_type,
+				'category_id'     => (int) ( $data['category_id'] ?? 0 ),
+				'subcategory_id'  => (int) ( $data['subcategory_id'] ?? 0 ),
+			],
+			[ '%s', '%s', '%d', '%d' ]
 		);
 		if ( ! $inserted ) {
 			return false;
@@ -1333,16 +1356,35 @@ class DatabaseHandler {
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public static function get_classes(): array {
+	public static function get_classes( array $args = [] ): array {
 		global $wpdb;
-		$rows = $wpdb->get_results(
-			'SELECT c.*, COUNT(s.id) AS subject_count
+		$where  = [ '1=1' ];
+		$params = [];
+		$scope  = array_key_exists( 'account_type', $args ) ? sanitize_key( (string) $args['account_type'] ) : self::get_account_type_scope();
+		if ( $scope && in_array( $scope, [ 'banin', 'banaat' ], true ) ) {
+			$where[]  = 'c.account_type = %s';
+			$params[] = $scope;
+		}
+
+		if ( ! empty( $args['category_id'] ) ) {
+			$where[]  = 'c.category_id = %d';
+			$params[] = (int) $args['category_id'];
+		}
+		if ( ! empty( $args['subcategory_id'] ) ) {
+			$where[]  = 'c.subcategory_id = %d';
+			$params[] = (int) $args['subcategory_id'];
+		}
+
+		$sql = 'SELECT c.*, COUNT(s.id) AS subject_count
 			   FROM ' . self::classes_table() . ' c
 			   LEFT JOIN ' . self::subjects_table() . ' s ON s.class_id = c.id
+			  WHERE ' . implode( ' AND ', $where ) . '
 			  GROUP BY c.id
-			  ORDER BY c.name ASC',
-			ARRAY_A
-		);
+			  ORDER BY c.name ASC';
+
+		$rows = $params
+			? $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			: $wpdb->get_results( $sql, ARRAY_A );
 		return $rows ?: [];
 	}
 
@@ -1354,8 +1396,9 @@ class DatabaseHandler {
 	 * Get categories with optional filters.
 	 *
 	 * @param array<string, mixed> $args {
-	 *     @type string|null $account_type 'banin' | 'banaat' | null (all). Default: current scope.
-	 *     @type int|null    $parent_id    Parent ID filter. Null = any.
+	 *     @type string|null $account_type    'banin' | 'banaat' | null (all). Default: current scope.
+	 *     @type int|null    $parent_id       Parent ID filter. Null = any.
+	 *     @type bool        $include_inactive Include inactive rows.
 	 * }
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -1373,6 +1416,9 @@ class DatabaseHandler {
 		if ( $scope ) {
 			$where[]  = 'account_type = %s';
 			$params[] = $scope;
+		}
+		if ( empty( $args['include_inactive'] ) ) {
+			$where[] = 'is_active = 1';
 		}
 		if ( array_key_exists( 'parent_id', $args ) ) {
 			$where[]  = 'parent_id = %d';
@@ -1436,6 +1482,8 @@ class DatabaseHandler {
 			$account_type = $scope;
 		}
 
+		$is_school_type = ! empty( $data['is_school_type'] ) ? 1 : 0;
+
 		$parent_id = (int) ( $data['parent_id'] ?? 0 );
 		if ( $parent_id > 0 ) {
 			$parent = $wpdb->get_row(
@@ -1445,19 +1493,24 @@ class DatabaseHandler {
 			if ( ! $parent || (int) $parent['parent_id'] !== 0 || $parent['account_type'] !== $account_type ) {
 				$parent_id = 0;
 			}
+			$is_school_type = 0;
 		}
 
 		$inserted = $wpdb->insert(
 			self::categories_table(),
 			[
-				'name'         => $name,
-				'parent_id'    => $parent_id,
-				'account_type' => $account_type,
-				'description'  => sanitize_textarea_field( $data['description'] ?? '' ),
-				'sort_order'   => (int) ( $data['sort_order'] ?? 0 ),
-				'created_at'   => current_time( 'mysql' ),
+				'name'           => $name,
+				'parent_id'      => $parent_id,
+				'account_type'   => $account_type,
+				'is_school_type' => $is_school_type,
+				'is_active'      => ! empty( $data['is_active'] ) ? 1 : 0,
+				'max_marks'      => (float) ( $data['max_marks'] ?? 0 ),
+				'pass_marks'     => (float) ( $data['pass_marks'] ?? 0 ),
+				'description'    => sanitize_textarea_field( $data['description'] ?? '' ),
+				'sort_order'     => (int) ( $data['sort_order'] ?? 0 ),
+				'created_at'     => current_time( 'mysql' ),
 			],
-			[ '%s', '%d', '%s', '%s', '%d', '%s' ]
+			[ '%s', '%d', '%s', '%d', '%d', '%f', '%f', '%s', '%d', '%s' ]
 		);
 
 		return $inserted ? (int) $wpdb->insert_id : false;
@@ -1486,6 +1539,8 @@ class DatabaseHandler {
 			$account_type = $scope;
 		}
 
+		$is_school_type = ! empty( $data['is_school_type'] ) ? 1 : 0;
+
 		$parent_id = (int) ( $data['parent_id'] ?? $current['parent_id'] ?? 0 );
 		if ( $parent_id > 0 ) {
 			$parent = $wpdb->get_row(
@@ -1495,6 +1550,7 @@ class DatabaseHandler {
 			if ( ! $parent || (int) $parent['parent_id'] !== 0 || $parent['account_type'] !== $account_type || $parent_id === $id ) {
 				$parent_id = 0;
 			}
+			$is_school_type = 0;
 		}
 
 		$name = sanitize_text_field( $data['name'] ?? $current['name'] ?? '' );
@@ -1505,14 +1561,18 @@ class DatabaseHandler {
 		$updated = $wpdb->update(
 			self::categories_table(),
 			[
-				'name'         => $name,
-				'parent_id'    => $parent_id,
-				'account_type' => $account_type,
-				'description'  => sanitize_textarea_field( $data['description'] ?? $current['description'] ?? '' ),
-				'sort_order'   => (int) ( $data['sort_order'] ?? $current['sort_order'] ?? 0 ),
+				'name'           => $name,
+				'parent_id'      => $parent_id,
+				'account_type'   => $account_type,
+				'is_school_type' => $is_school_type,
+				'is_active'      => ! empty( $data['is_active'] ) ? 1 : 0,
+				'max_marks'      => (float) ( $data['max_marks'] ?? $current['max_marks'] ?? 0 ),
+				'pass_marks'     => (float) ( $data['pass_marks'] ?? $current['pass_marks'] ?? 0 ),
+				'description'    => sanitize_textarea_field( $data['description'] ?? $current['description'] ?? '' ),
+				'sort_order'     => (int) ( $data['sort_order'] ?? $current['sort_order'] ?? 0 ),
 			],
 			[ 'id' => $id ],
-			[ '%s', '%d', '%s', '%s', '%d' ],
+			[ '%s', '%d', '%s', '%d', '%d', '%f', '%f', '%s', '%d' ],
 			[ '%d' ]
 		);
 
@@ -2131,13 +2191,26 @@ class DatabaseHandler {
 	 * @param string[] $subjects
 	 * @return bool
 	 */
-	public static function update_class( int $id, string $name, array $subjects = [] ): bool {
+	public static function update_class( int $id, string $name, array $subjects = [], array $data = [] ): bool {
 		global $wpdb;
+		$scope = self::get_account_type_scope();
+		$account_type = sanitize_key( (string) ( $data['account_type'] ?? $scope ?? 'banin' ) );
+		if ( ! in_array( $account_type, [ 'banin', 'banaat' ], true ) ) {
+			$account_type = 'banin';
+		}
+		if ( $scope ) {
+			$account_type = $scope;
+		}
 		$result = $wpdb->update(
 			self::classes_table(),
-			[ 'name' => sanitize_text_field( $name ) ],
+			[
+				'name'           => sanitize_text_field( $name ),
+				'account_type'    => $account_type,
+				'category_id'     => (int) ( $data['category_id'] ?? 0 ),
+				'subcategory_id'  => (int) ( $data['subcategory_id'] ?? 0 ),
+			],
 			[ 'id'   => $id ],
-			[ '%s' ],
+			[ '%s', '%s', '%d', '%d' ],
 			[ '%d' ]
 		);
 		self::replace_subjects( $id, $subjects );
@@ -2168,11 +2241,32 @@ class DatabaseHandler {
 	 */
 	public static function get_classes_dropdown(): array {
 		global $wpdb;
+		$scope = self::get_account_type_scope();
+		if ( $scope && in_array( $scope, [ 'banin', 'banaat' ], true ) ) {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT id, name FROM ' . self::classes_table() . ' WHERE account_type = %s ORDER BY name ASC',
+					$scope
+				),
+				ARRAY_A
+			);
+			return $rows ?: [];
+		}
 		$rows = $wpdb->get_results(
 			'SELECT id, name FROM ' . self::classes_table() . ' ORDER BY name ASC',
 			ARRAY_A
 		);
 		return $rows ?: [];
+	}
+
+	/**
+	 * Get classes filtered by category/sub-category context.
+	 *
+	 * @param array<string, mixed> $args
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_classes_by_context( array $args = [] ): array {
+		return self::get_classes( $args );
 	}
 
 	// -----------------------------------------------------------------------
@@ -2295,6 +2389,21 @@ class DatabaseHandler {
 				'account_type' => $scope,
 			];
 		}
+
+		$category_id = (int) ( $data['category_id'] ?? 0 );
+		if ( $category_id > 0 ) {
+			global $wpdb;
+			$account_type = (string) $wpdb->get_var(
+				$wpdb->prepare( 'SELECT account_type FROM ' . self::categories_table() . ' WHERE id = %d', $category_id )
+			);
+			if ( in_array( $account_type, [ 'banin', 'banaat' ], true ) ) {
+				return [
+					'gender'       => ( 'banaat' === $account_type ) ? 'female' : 'male',
+					'account_type' => $account_type,
+				];
+			}
+		}
+
 		$account_type = ( 'female' === $gender ) ? 'banaat' : 'banin';
 		return [
 			'gender'       => $gender,
@@ -2305,18 +2414,19 @@ class DatabaseHandler {
 	/**
 	 * Validate category/subcategory selection for a student.
 	 *
-	 * @return array{category_id: int, subcategory_id: int}
+	 * @return array{category_id: int, subcategory_id: int, class_id: int}
 	 */
 	private static function normalize_student_category( array $data, string $account_type ): array {
 		global $wpdb;
 
 		$category_id    = (int) ( $data['category_id'] ?? 0 );
 		$subcategory_id = (int) ( $data['subcategory_id'] ?? 0 );
+		$class_id       = (int) ( $data['class_id'] ?? 0 );
 
 		$category = null;
 		if ( $category_id > 0 ) {
 			$category = $wpdb->get_row(
-				$wpdb->prepare( 'SELECT id, parent_id, account_type FROM ' . self::categories_table() . ' WHERE id = %d', $category_id ),
+				$wpdb->prepare( 'SELECT id, parent_id, account_type, name, is_school_type FROM ' . self::categories_table() . ' WHERE id = %d', $category_id ),
 				ARRAY_A
 			);
 			if ( ! $category || (int) $category['parent_id'] !== 0 || $category['account_type'] !== $account_type ) {
@@ -2327,7 +2437,7 @@ class DatabaseHandler {
 
 		if ( $subcategory_id > 0 ) {
 			$subcategory = $wpdb->get_row(
-				$wpdb->prepare( 'SELECT id, parent_id, account_type FROM ' . self::categories_table() . ' WHERE id = %d', $subcategory_id ),
+				$wpdb->prepare( 'SELECT id, parent_id, account_type, name FROM ' . self::categories_table() . ' WHERE id = %d', $subcategory_id ),
 				ARRAY_A
 			);
 			if ( ! $subcategory || (int) $subcategory['parent_id'] <= 0 || $subcategory['account_type'] !== $account_type ) {
@@ -2342,9 +2452,61 @@ class DatabaseHandler {
 			}
 		}
 
+		if ( $class_id <= 0 && $category_id > 0 && $subcategory_id > 0 ) {
+			$matching_classes = self::get_classes_by_context(
+				[
+					'category_id'    => $category_id,
+					'subcategory_id' => $subcategory_id,
+					'account_type'   => $account_type,
+				]
+			);
+			if ( ! empty( $matching_classes ) ) {
+				$class_id = (int) $matching_classes[0]['id'];
+			} elseif ( $category && empty( $category['is_school_type'] ) ) {
+				$subcategory_name = $subcategory['name'] ?? $category['name'] ?? __( 'Course', 'noor-tms' );
+				$new_class_id = self::insert_class(
+					(string) $subcategory_name,
+					[],
+					[
+						'category_id'    => $category_id,
+						'subcategory_id' => $subcategory_id,
+						'account_type'   => $account_type,
+					]
+				);
+				if ( $new_class_id ) {
+					$class_id = (int) $new_class_id;
+				}
+			}
+		}
+
+		if ( $class_id > 0 ) {
+			$class = $wpdb->get_row(
+				$wpdb->prepare( 'SELECT id, category_id, subcategory_id FROM ' . self::classes_table() . ' WHERE id = %d', $class_id ),
+				ARRAY_A
+			);
+			if ( ! $class ) {
+				$class_id = 0;
+			} else {
+				if ( $category_id <= 0 && ! empty( $class['category_id'] ) ) {
+					$category_id = (int) $class['category_id'];
+				}
+				if ( $subcategory_id <= 0 && ! empty( $class['subcategory_id'] ) ) {
+					$subcategory_id = (int) $class['subcategory_id'];
+				}
+
+				if ( ! empty( $class['category_id'] ) && $category_id > 0 && (int) $class['category_id'] !== $category_id ) {
+					$class_id = 0;
+				}
+				if ( ! empty( $class['subcategory_id'] ) && $subcategory_id > 0 && (int) $class['subcategory_id'] !== $subcategory_id ) {
+					$class_id = 0;
+				}
+			}
+		}
+
 		return [
 			'category_id'    => $category_id,
 			'subcategory_id' => $subcategory_id,
+			'class_id'       => $class_id,
 		];
 	}
 
@@ -2359,7 +2521,7 @@ class DatabaseHandler {
 		$identity = self::normalize_student_identity( $data );
 		$category = self::normalize_student_category( $data, $identity['account_type'] );
 		$row = [
-			'class_id'        => (int) ( $data['class_id'] ?? 0 ),
+			'class_id'        => $category['class_id'],
 			'name'            => sanitize_text_field( $data['name'] ?? '' ),
 			'parent_phone'    => sanitize_text_field( $data['parent_phone'] ?? '' ),
 			'gender'          => $identity['gender'],
@@ -2516,7 +2678,7 @@ class DatabaseHandler {
 		$identity = self::normalize_student_identity( $data );
 		$category = self::normalize_student_category( $data, $identity['account_type'] );
 		$row = [
-			'class_id'        => (int) ( $data['class_id'] ?? 0 ),
+			'class_id'        => $category['class_id'],
 			'name'            => sanitize_text_field( $data['name'] ?? '' ),
 			'parent_phone'    => sanitize_text_field( $data['parent_phone'] ?? '' ),
 			'gender'          => $identity['gender'],
@@ -2575,7 +2737,31 @@ class DatabaseHandler {
 		$sql  = "SELECT id, name, class_id, parent_phone, status FROM " . self::students_table() . " s";
 		$sql .= ' WHERE ' . implode( ' AND ', $where ) . ' ORDER BY name ASC';
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
-		return $rows ?: [];
+		if ( ! empty( $rows ) || $class_id <= 0 ) {
+			return $rows ?: [];
+		}
+
+		$class = self::get_class( $class_id );
+		if ( ! $class ) {
+			return [];
+		}
+
+		$fallback_where  = [ 'status = %s' ];
+		$fallback_params = [ 'active' ];
+		if ( ! empty( $class['category_id'] ) ) {
+			$fallback_where[]  = 'category_id = %d';
+			$fallback_params[] = (int) $class['category_id'];
+		}
+		if ( ! empty( $class['subcategory_id'] ) ) {
+			$fallback_where[]  = 'subcategory_id = %d';
+			$fallback_params[] = (int) $class['subcategory_id'];
+		}
+		$fallback_where[] = 'class_id = 0';
+		self::add_account_type_filter( $fallback_where, $fallback_params, 's' );
+		$fallback_sql  = "SELECT id, name, class_id, parent_phone, status FROM " . self::students_table() . " s";
+		$fallback_sql .= ' WHERE ' . implode( ' AND ', $fallback_where ) . ' ORDER BY name ASC';
+		$fallback_rows = $wpdb->get_results( $wpdb->prepare( $fallback_sql, ...$fallback_params ), ARRAY_A );
+		return $fallback_rows ?: [];
 	}
 
 	/**
@@ -2597,7 +2783,32 @@ class DatabaseHandler {
 		$rows = $params
 			? $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A )
 			: $wpdb->get_results( $sql, ARRAY_A );
-		return $rows ?: [];
+		if ( ! empty( $rows ) || $class_id <= 0 ) {
+			return $rows ?: [];
+		}
+
+		$class = self::get_class( $class_id );
+		if ( ! $class ) {
+			return [];
+		}
+
+		$fallback_where  = [ "status = 'active'" ];
+		$fallback_params = [];
+		if ( ! empty( $class['category_id'] ) ) {
+			$fallback_where[]  = 'category_id = %d';
+			$fallback_params[] = (int) $class['category_id'];
+		}
+		if ( ! empty( $class['subcategory_id'] ) ) {
+			$fallback_where[]  = 'subcategory_id = %d';
+			$fallback_params[] = (int) $class['subcategory_id'];
+		}
+		$fallback_where[] = 'class_id = 0';
+		self::add_account_type_filter( $fallback_where, $fallback_params, 's' );
+		$fallback_sql = "SELECT id, name FROM " . self::students_table() . " s WHERE " . implode( ' AND ', $fallback_where ) . ' ORDER BY name ASC';
+		$fallback_rows = $fallback_params
+			? $wpdb->get_results( $wpdb->prepare( $fallback_sql, ...$fallback_params ), ARRAY_A )
+			: $wpdb->get_results( $fallback_sql, ARRAY_A );
+		return $fallback_rows ?: [];
 	}
 
 	// -----------------------------------------------------------------------

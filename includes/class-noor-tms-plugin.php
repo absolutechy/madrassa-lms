@@ -124,6 +124,10 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_chat_send', $public, 'ajax_chat_send' );
 		$this->loader->add_action( 'wp_ajax_noor_tms_chat_fetch',        $public, 'ajax_chat_fetch' );
 		$this->loader->add_action( 'wp_ajax_nopriv_noor_tms_chat_fetch', $public, 'ajax_chat_fetch' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_get_categories',    $public, 'ajax_get_categories' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_get_subcategories',  $public, 'ajax_get_subcategories' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_get_classes',        $public, 'ajax_get_classes' );
+		$this->loader->add_action( 'wp_ajax_noor_tms_save_category_card', $public, 'ajax_save_category_card' );
 
 		// admin-post.php handlers (front-end form submissions).
 		$this->loader->add_action( 'admin_post_noor_tms_save_student',  $public, 'process_student_form' );
@@ -166,7 +170,7 @@ final class Plugin {
 	 */
 	public function maybe_upgrade_database(): void {
 		$installed = (string) get_option( 'noor_tms_db_version', '1.0' );
-		if ( version_compare( $installed, '10.0', '<' ) ) {
+		if ( version_compare( $installed, '10.1', '<' ) ) {
 			DatabaseHandler::create_tables();
 		}
 	}

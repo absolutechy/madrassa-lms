@@ -42,6 +42,7 @@ class PublicController {
 		add_shortcode( 'noor_tms_homepage',   [ $this, 'sc_homepage' ] );
 		add_shortcode( 'noor_tms_login',      [ $this, 'sc_login' ] );
 		add_shortcode( 'noor_tms_students',   [ $this, 'sc_students' ] );
+		add_shortcode( 'noor_tms_categories', [ $this, 'sc_categories' ] );
 		add_shortcode( 'noor_tms_classes',    [ $this, 'sc_classes' ] );
 		add_shortcode( 'noor_tms_results',    [ $this, 'sc_results' ] );
 		add_shortcode( 'noor_tms_teachers',   [ $this, 'sc_teachers' ] );
@@ -66,6 +67,7 @@ class PublicController {
 		$tms_shortcodes = [
 			'noor_tms_homepage',
 			'noor_tms_login', 'noor_tms_students',
+			'noor_tms_categories',
 			'noor_tms_classes', 'noor_tms_results',
 			'noor_tms_teachers',
 			'noor_tms_settings', 'noor_tms_attendance',
@@ -153,7 +155,7 @@ class PublicController {
 		// All TMS pages — including login — must never be cached.
 		$all_tms = [
 			'noor_tms_login',
-			'noor_tms_students', 'noor_tms_classes',
+			'noor_tms_students', 'noor_tms_categories', 'noor_tms_classes',
 			'noor_tms_results',  'noor_tms_teachers',
 			'noor_tms_settings',
 			'noor_tms_attendance',
@@ -185,7 +187,7 @@ class PublicController {
 
 		// Auth guard for protected pages (not the login page).
 		$protected = [
-			'noor_tms_students', 'noor_tms_classes',
+			'noor_tms_students', 'noor_tms_categories', 'noor_tms_classes',
 			'noor_tms_results',  'noor_tms_teachers',
 			'noor_tms_settings',
 			'noor_tms_attendance',
@@ -325,6 +327,26 @@ class PublicController {
 	}
 
 	/**
+	 * [noor_tms_categories] – Category index + detail shell.
+	 */
+	public function sc_categories(): string {
+		$category_id = (int) ( $_GET['category_id'] ?? 0 );
+		$categories  = DatabaseHandler::get_categories( [ 'parent_id' => 0 ] );
+		$category    = $category_id ? DatabaseHandler::get_category( $category_id ) : null;
+		$subcategories = $category_id ? DatabaseHandler::get_categories( [ 'parent_id' => $category_id ] ) : [];
+
+		if ( ! $category && ! empty( $categories ) ) {
+			$category = $categories[0];
+			$category_id = (int) $category['id'];
+			$subcategories = DatabaseHandler::get_categories( [ 'parent_id' => $category_id ] );
+		}
+
+		ob_start();
+		include NOOR_TMS_PLUGIN_DIR . 'public/templates/categories.php';
+		return ob_get_clean();
+	}
+
+	/**
 	 * [noor_tms_classes] – Classes grid + create/edit form.
 	 * Teachers see only their assigned classes (read-only).
 	 */
@@ -332,9 +354,19 @@ class PublicController {
 		// Auth + POST are handled in handle_early_requests() on template_redirect.
 		$action   = sanitize_key( $_GET['tms_action'] ?? 'list' );
 		$class_id = (int) ( $_GET['class_id'] ?? 0 );
+		$category_id = (int) ( $_GET['category_id'] ?? 0 );
+		$subcategory_id = (int) ( $_GET['subcategory_id'] ?? 0 );
 
 		$is_manager = noor_tms_can_manage();
 		$is_teacher = current_user_can( 'noor_tms_teacher' );
+		$scope_category = $category_id > 0 ? DatabaseHandler::get_category( $category_id ) : null;
+		$scope_subcategory = $subcategory_id > 0 ? DatabaseHandler::get_category( $subcategory_id ) : null;
+		$classes_scope = [];
+		if ( $subcategory_id > 0 ) {
+			$classes_scope['subcategory_id'] = $subcategory_id;
+		} elseif ( $category_id > 0 ) {
+			$classes_scope['category_id'] = $category_id;
+		}
 
 		ob_start();
 
@@ -342,15 +374,21 @@ class PublicController {
 			$cls      = $class_id ? DatabaseHandler::get_class( $class_id ) : null;
 			// For teachers, only allow editing their own classes (optional check could be added here)
 			$subjects = $class_id ? DatabaseHandler::get_subjects_by_class( $class_id ) : [];
+			if ( ! $category_id && ! empty( $cls['category_id'] ) ) {
+				$category_id = (int) $cls['category_id'];
+			}
+			if ( ! $subcategory_id && ! empty( $cls['subcategory_id'] ) ) {
+				$subcategory_id = (int) $cls['subcategory_id'];
+			}
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/class-form.php';
 		} else {
 			if ( ! $is_manager ) {
 				$teacher   = DatabaseHandler::get_teacher_by_user( get_current_user_id() );
 				$class_ids = $teacher ? DatabaseHandler::get_teacher_class_ids( (int) $teacher['id'] ) : [];
-				$all       = DatabaseHandler::get_classes();
+				$all       = $classes_scope ? DatabaseHandler::get_classes_by_context( $classes_scope ) : DatabaseHandler::get_classes();
 				$classes   = array_values( array_filter( $all, fn( $c ) => in_array( (int) $c['id'], $class_ids, true ) ) );
 			} else {
-				$classes = DatabaseHandler::get_classes();
+				$classes = $classes_scope ? DatabaseHandler::get_classes_by_context( $classes_scope ) : DatabaseHandler::get_classes();
 			}
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/classes.php';
 		}
@@ -363,6 +401,8 @@ class PublicController {
 	 */
 	public function sc_results(): string {
 		// Auth is handled in handle_early_requests() on template_redirect.
+		$category_id    = (int) ( $_GET['category_id']    ?? 0 );
+		$subcategory_id = (int) ( $_GET['subcategory_id'] ?? 0 );
 		$class_id   = (int) ( $_GET['class_id']   ?? 0 );
 		$student_id = (int) ( $_GET['student_id'] ?? 0 );
 		$exam_date  = sanitize_text_field( $_GET['exam_date'] ?? '' );
@@ -383,25 +423,181 @@ class PublicController {
 			exit;
 		}
 
+		$visible_scopes = $this->get_results_visible_scopes();
+
 		ob_start();
 
 		if ( $class_id ) {
 			$class      = DatabaseHandler::get_class( $class_id );
 			$subjects   = DatabaseHandler::get_subjects_by_class( $class_id );
+			if ( empty( $subjects ) ) {
+				$subject_label = $class['name'] ?? '';
+				if ( empty( $subject_label ) && ! empty( $class['subcategory_id'] ) ) {
+					$subcat = DatabaseHandler::get_category( (int) $class['subcategory_id'] );
+					if ( $subcat ) {
+						$subject_label = (string) $subcat['name'];
+					}
+				}
+				if ( '' !== $subject_label ) {
+					$subjects = [
+						[ 'id' => 0, 'subject_name' => $subject_label ],
+					];
+				}
+			}
 			$students   = DatabaseHandler::get_students_dropdown( $class_id );
 			$exam_dates = DatabaseHandler::get_exam_dates_by_class( $class_id );
 			$summary    = $exam_date ? DatabaseHandler::get_results_summary_by_class( $class_id, $exam_date ) : [];
 			$opts       = Settings::get_options();
 			$is_ctc     = ( $opts['gateway_provider'] ?? 'click_to_chat' ) === 'click_to_chat';
+			$category   = $category_id ? DatabaseHandler::get_category( $category_id ) : null;
+			$subcategory = $subcategory_id ? DatabaseHandler::get_category( $subcategory_id ) : null;
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/results-class.php';
 		} else {
-			$classes = $is_manager
-				? DatabaseHandler::get_classes()
-				: array_values( array_filter( DatabaseHandler::get_classes(), fn( $c ) => in_array( (int) $c['id'], $allowed_class_ids, true ) ) );
+			if ( $subcategory_id > 0 ) {
+				$category = $category_id ? DatabaseHandler::get_category( $category_id ) : null;
+				$subcategory = DatabaseHandler::get_category( $subcategory_id );
+				$classes = $this->get_results_classes_for_context( $category_id, $subcategory_id, $allowed_class_ids );
+			} elseif ( $category_id > 0 ) {
+				$category = DatabaseHandler::get_category( $category_id );
+				$subcategories = $this->get_results_subcategories_for_category( $category_id, $allowed_class_ids );
+				$classes = [];
+			} else {
+				$categories_by_scope = $this->get_results_categories_by_scope( $visible_scopes, $allowed_class_ids );
+				$subcategories = [];
+				$classes = [];
+			}
+			if ( ! isset( $categories_by_scope ) ) {
+				$categories_by_scope = [];
+			}
+			if ( ! isset( $subcategories ) ) {
+				$subcategories = [];
+			}
 			include NOOR_TMS_PLUGIN_DIR . 'public/templates/results.php';
 		}
 
 		return ob_get_clean();
+	}
+
+	/**
+	 * Return the account-type scopes visible to the current user on results screens.
+	 *
+	 * @return array<int, string|null>
+	 */
+	private function get_results_visible_scopes(): array {
+		if ( current_user_can( 'manage_options' ) || ( current_user_can( 'manage_banin' ) && current_user_can( 'manage_banaat' ) ) ) {
+			return [ 'banin', 'banaat' ];
+		}
+		if ( current_user_can( 'manage_banin' ) ) {
+			return [ 'banin' ];
+		}
+		if ( current_user_can( 'manage_banaat' ) ) {
+			return [ 'banaat' ];
+		}
+		return [ null ];
+	}
+
+	/**
+	 * Filter a class list to the classes the current user may see.
+	 *
+	 * @param array<int, array<string, mixed>> $classes
+	 * @param array<int, int>                  $allowed_class_ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function filter_visible_classes( array $classes, array $allowed_class_ids ): array {
+		if ( empty( $allowed_class_ids ) ) {
+			return $classes;
+		}
+
+		return array_values(
+			array_filter(
+				$classes,
+				static fn( array $class ): bool => in_array( (int) $class['id'], $allowed_class_ids, true )
+			)
+		);
+	}
+
+	/**
+	 * Get root categories grouped by account-type scope.
+	 *
+	 * @param array<int, string|null> $scopes
+	 * @param array<int, int>         $allowed_class_ids
+	 * @return array<string, array<int, array<string, mixed>>>
+	 */
+	private function get_results_categories_by_scope( array $scopes, array $allowed_class_ids ): array {
+		$groups = [];
+		foreach ( $scopes as $scope ) {
+			$categories = DatabaseHandler::get_categories(
+				[
+					'parent_id' => 0,
+					'account_type' => $scope,
+				]
+			);
+			$visible = [];
+			foreach ( $categories as $category ) {
+				$subcategories = $this->get_results_subcategories_for_category( (int) $category['id'], $allowed_class_ids, $scope );
+				$visible[] = [
+					'category'      => $category,
+					'subcategories' => $subcategories,
+				];
+			}
+			if ( ! empty( $visible ) ) {
+				$groups[ $scope ?? 'all' ] = $visible;
+			}
+		}
+
+		return $groups;
+	}
+
+	/**
+	 * Get subcategories for one category, keeping only visible class branches.
+	 *
+	 * @param int                 $category_id
+	 * @param array<int, int>     $allowed_class_ids
+	 * @param string|null         $scope
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_results_subcategories_for_category( int $category_id, array $allowed_class_ids, ?string $scope = null ): array {
+		$subcategories = DatabaseHandler::get_categories(
+			[
+				'parent_id' => $category_id,
+				'account_type' => $scope,
+			]
+		);
+		$visible = [];
+		foreach ( $subcategories as $subcategory ) {
+			$classes = $this->get_results_classes_for_context( $category_id, (int) $subcategory['id'], $allowed_class_ids, $scope );
+			$visible[] = [
+				'subcategory' => $subcategory,
+				'classes'     => $classes,
+			];
+		}
+
+		return $visible;
+	}
+
+	/**
+	 * Get classes for a category/subcategory context.
+	 *
+	 * @param int                 $category_id
+	 * @param int                 $subcategory_id
+	 * @param array<int, int>     $allowed_class_ids
+	 * @param string|null         $scope
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_results_classes_for_context( int $category_id, int $subcategory_id, array $allowed_class_ids, ?string $scope = null ): array {
+		$args = [];
+		if ( $category_id > 0 ) {
+			$args['category_id'] = $category_id;
+		}
+		if ( $subcategory_id > 0 ) {
+			$args['subcategory_id'] = $subcategory_id;
+		}
+		if ( null !== $scope ) {
+			$args['account_type'] = $scope;
+		}
+
+		$classes = DatabaseHandler::get_classes_by_context( $args );
+		return $this->filter_visible_classes( $classes, $allowed_class_ids );
 	}
 
 	/**
@@ -723,6 +919,21 @@ class PublicController {
 	// -----------------------------------------------------------------------
 
 	/**
+	 * Resolve the current manager's account scope.
+	 */
+	private function get_current_account_scope(): ?string {
+		$can_banin  = current_user_can( 'manage_banin' );
+		$can_banaat = current_user_can( 'manage_banaat' );
+		if ( $can_banin && ! $can_banaat ) {
+			return 'banin';
+		}
+		if ( $can_banaat && ! $can_banin ) {
+			return 'banaat';
+		}
+		return null;
+	}
+
+	/**
 	 * Redirect to login page if the visitor is not a TMS user.
 	 */
 	private function require_auth(): void {
@@ -760,6 +971,105 @@ class PublicController {
 
 		$class_id = (int) ( $_POST['class_id'] ?? 0 );
 		$this->handle_class_save( $class_id );
+	}
+
+	/**
+	 * AJAX: return categories for the current account scope.
+	 */
+	public function ajax_get_categories(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$account_type = $this->get_current_account_scope();
+		$args = [ 'parent_id' => 0 ];
+		if ( $account_type ) {
+			$args['account_type'] = $account_type;
+		}
+
+		wp_send_json_success( [ 'categories' => DatabaseHandler::get_categories( $args ) ] );
+	}
+
+	/**
+	 * AJAX: return sub-categories for a parent category.
+	 */
+	public function ajax_get_subcategories(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$parent_id = (int) ( $_POST['parent_id'] ?? 0 );
+		if ( $parent_id <= 0 ) {
+			wp_send_json_success( [ 'subcategories' => [] ] );
+		}
+
+		$account_type = $this->get_current_account_scope();
+		$args = [ 'parent_id' => $parent_id ];
+		if ( $account_type ) {
+			$args['account_type'] = $account_type;
+		}
+
+		wp_send_json_success( [ 'subcategories' => DatabaseHandler::get_categories( $args ) ] );
+	}
+
+	/**
+	 * AJAX: return classes scoped to a sub-category.
+	 */
+	public function ajax_get_classes(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$subcategory_id = (int) ( $_POST['subcategory_id'] ?? 0 );
+		if ( $subcategory_id <= 0 ) {
+			wp_send_json_success( [ 'classes' => [] ] );
+		}
+
+		wp_send_json_success( [ 'classes' => DatabaseHandler::get_classes_by_context( [ 'subcategory_id' => $subcategory_id ] ) ] );
+	}
+
+	/**
+	 * AJAX: save a simple-type sub-category card.
+	 */
+	public function ajax_save_category_card(): void {
+		check_ajax_referer( 'noor_tms_ajax', 'nonce' );
+
+		if ( ! noor_tms_can_manage() ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'noor-tms' ) ], 403 );
+		}
+
+		$category_id = (int) ( $_POST['category_id'] ?? 0 );
+		$category = $category_id > 0 ? DatabaseHandler::get_category( $category_id ) : null;
+		if ( ! $category || (int) $category['parent_id'] <= 0 ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid sub-category.', 'noor-tms' ) ], 400 );
+		}
+
+		$scope = $this->get_current_account_scope();
+		if ( $scope && (string) $category['account_type'] !== $scope ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid sub-category scope.', 'noor-tms' ) ], 403 );
+		}
+
+		$ok = DatabaseHandler::update_category(
+			$category_id,
+			[
+				'name'      => sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) ),
+				'is_active' => (int) ( $_POST['is_active'] ?? 1 ),
+				'max_marks' => (float) ( $_POST['max_marks'] ?? 0 ),
+				'pass_marks'=> (float) ( $_POST['pass_marks'] ?? 0 ),
+			]
+		);
+
+		if ( ! $ok ) {
+			wp_send_json_error( [ 'message' => __( 'Could not save sub-category.', 'noor-tms' ) ], 500 );
+		}
+
+		wp_send_json_success( [ 'message' => __( 'Sub-category saved.', 'noor-tms' ) ] );
 	}
 
 	/**
@@ -1053,7 +1363,7 @@ class PublicController {
 		}
 
 		$data = [
-			'class_id'        => 0,
+			'class_id'        => (int) ( $_POST['class_id'] ?? 0 ),
 			'name'            => sanitize_text_field( $_POST['name']            ?? '' ),
 			'parent_phone'    => sanitize_text_field( $_POST['parent_phone']    ?? '' ),
 			'category_id'     => (int) ( $_POST['category_id']     ?? 0 ),
@@ -1218,6 +1528,8 @@ class PublicController {
 		}
 
 		$name     = sanitize_text_field( $_POST['class_name'] ?? '' );
+		$category_id = (int) ( $_POST['category_id'] ?? 0 );
+		$subcategory_id = (int) ( $_POST['subcategory_id'] ?? 0 );
 		$subjects = array_filter(
 			array_map( 'sanitize_text_field', (array) ( $_POST['subjects'] ?? [] ) )
 		);
@@ -1227,10 +1539,16 @@ class PublicController {
 		}
 
 		if ( $class_id > 0 ) {
-			DatabaseHandler::update_class( $class_id, $name, array_values( $subjects ) );
+			DatabaseHandler::update_class( $class_id, $name, array_values( $subjects ), [
+				'category_id'    => $category_id,
+				'subcategory_id' => $subcategory_id,
+			] );
 			$msg = 'class_updated';
 		} else {
-			$new_class_id = DatabaseHandler::insert_class( $name, array_values( $subjects ) );
+			$new_class_id = DatabaseHandler::insert_class( $name, array_values( $subjects ), [
+				'category_id'    => $category_id,
+				'subcategory_id' => $subcategory_id,
+			] );
 			if ( $new_class_id && ! noor_tms_can_manage() && current_user_can( 'noor_tms_teacher' ) ) {
 				$teacher = DatabaseHandler::get_teacher_by_user( get_current_user_id() );
 				if ( $teacher ) {
@@ -1242,7 +1560,15 @@ class PublicController {
 			$msg = 'class_added';
 		}
 
-		wp_safe_redirect( add_query_arg( 'msg', $msg, home_url( '/tms-classes/' ) ) );
+		$redirect_args = [ 'msg' => $msg ];
+		if ( $category_id > 0 ) {
+			$redirect_args['category_id'] = $category_id;
+		}
+		if ( $subcategory_id > 0 ) {
+			$redirect_args['subcategory_id'] = $subcategory_id;
+		}
+
+		wp_safe_redirect( add_query_arg( $redirect_args, home_url( '/tms-classes/' ) ) );
 		exit;
 	}
 

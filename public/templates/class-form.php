@@ -15,7 +15,18 @@ defined( 'ABSPATH' ) || exit;
 $is_edit        = ! empty( $cls );
 $page_title     = $is_edit ? __( 'Edit Class', 'noor-tms' ) : __( 'Add New Class', 'noor-tms' );
 $active_nav     = 'classes';
-$topbar_actions = '<a href="' . esc_url( home_url( '/tms-classes/' ) ) . '" class="noor-btn noor-btn--secondary">'
+$back_url = add_query_arg(
+	array_filter(
+		[
+			'category_id'    => (int) ( $category_id ?? 0 ),
+			'subcategory_id' => (int) ( $subcategory_id ?? 0 ),
+		],
+		static fn( $value ) => (int) $value > 0
+	),
+	home_url( '/tms-classes/' )
+);
+
+$topbar_actions = '<a href="' . esc_url( $back_url ) . '" class="noor-btn noor-btn--secondary">'
 	. '&larr; ' . esc_html__( 'Back to Classes', 'noor-tms' ) . '</a>';
 
 include __DIR__ . '/layout.php';
@@ -31,6 +42,23 @@ include __DIR__ . '/layout.php';
 		<?php wp_nonce_field( 'noor_tms_save_class', 'noor_tms_class_nonce' ); ?>
 		<input type="hidden" name="action" value="noor_tms_save_class" />
 		<input type="hidden" name="class_id" value="<?php echo esc_attr( $class_id ); ?>" />
+		<input type="hidden" name="category_id" value="<?php echo esc_attr( (string) ( $category_id ?? ( $cls['category_id'] ?? 0 ) ) ); ?>" />
+		<input type="hidden" name="subcategory_id" value="<?php echo esc_attr( (string) ( $subcategory_id ?? ( $cls['subcategory_id'] ?? 0 ) ) ); ?>" />
+
+		<?php if ( ! empty( $category_id ) || ! empty( $subcategory_id ) ) : ?>
+			<p class="noor-form-description">
+				<?php
+				$crumbs = [];
+				if ( ! empty( $category_id ) ) {
+					$crumbs[] = esc_html( $scope_category['name'] ?? (string) $category_id );
+				}
+				if ( ! empty( $subcategory_id ) ) {
+					$crumbs[] = esc_html( $scope_subcategory['name'] ?? (string) $subcategory_id );
+				}
+				echo esc_html( implode( ' / ', $crumbs ) );
+				?>
+			</p>
+		<?php endif; ?>
 
 		<div class="noor-form-group" style="max-width:420px;">
 			<label for="class_name"><?php esc_html_e( 'Class Name', 'noor-tms' ); ?> <span class="required">*</span></label>

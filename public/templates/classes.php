@@ -12,10 +12,31 @@ defined( 'ABSPATH' ) || exit;
 
 $page_title     = __( 'Classes', 'noor-tms' );
 $active_nav     = 'classes';
-$topbar_actions = '<a href="' . esc_url( add_query_arg( 'tms_action', 'new', home_url( '/tms-classes/' ) ) ) . '"'
+
+$add_class_url = add_query_arg(
+	array_filter(
+		[
+			'tms_action'     => 'new',
+			'category_id'    => (int) ( $category_id ?? 0 ),
+			'subcategory_id' => (int) ( $subcategory_id ?? 0 ),
+		],
+		static fn( $value ) => (int) $value > 0 || 'new' === $value
+	),
+	home_url( '/tms-classes/' )
+);
+
+$topbar_actions = '<a href="' . esc_url( $add_class_url ) . '"'
 	. ' class="noor-btn noor-btn--primary">+ ' . esc_html__( 'Add New Class', 'noor-tms' ) . '</a>';
 
 include __DIR__ . '/layout.php';
+
+$scope_bits = [];
+if ( ! empty( $category_id ) ) {
+	$scope_bits[] = sprintf( __( 'Category: %s', 'noor-tms' ), $scope_category['name'] ?? (string) $category_id );
+}
+if ( ! empty( $subcategory_id ) ) {
+	$scope_bits[] = sprintf( __( 'Sub-Category: %s', 'noor-tms' ), $scope_subcategory['name'] ?? (string) $subcategory_id );
+}
 
 $msg = sanitize_key( $_GET['msg'] ?? '' );
 if ( 'class_added' === $msg ) {
@@ -25,11 +46,17 @@ if ( 'class_added' === $msg ) {
 }
 ?>
 
+<?php if ( ! empty( $scope_bits ) ) : ?>
+	<div class="noor-notice noor-notice--info">
+		<?php echo esc_html( implode( ' | ', $scope_bits ) ); ?>
+	</div>
+<?php endif; ?>
+
 <?php if ( empty( $classes ) ) : ?>
 	<div class="noor-empty">
 		<span class="noor-empty-icon">&#127979;</span>
 		<p><?php esc_html_e( 'No classes yet. Create your first class to get started.', 'noor-tms' ); ?></p>
-		<a href="<?php echo esc_url( add_query_arg( 'tms_action', 'new', home_url( '/tms-classes/' ) ) ); ?>"
+		<a href="<?php echo esc_url( $add_class_url ); ?>"
 		   class="noor-btn noor-btn--primary">+ <?php esc_html_e( 'Create a Class', 'noor-tms' ); ?></a>
 	</div>
 <?php else : ?>

@@ -7,7 +7,7 @@
  *
  * Required variables in scope (set by calling template):
  *   $page_title   string  Shown in the top-bar.
- *   $active_nav   string  One of: students | classes | results | settings
+ *   $active_nav   string  One of: students | categories | classes | results | settings
  *   $topbar_actions string|null  Optional HTML for add/action buttons in top-bar.
  *
  * @package Noor_TMS
@@ -34,10 +34,10 @@ $nav_items['attendance'] = [
 	'url'   => home_url( '/tms-attendance/' ),
 ];
 
-$nav_items['classes'] = [
+	$nav_items['categories'] = [
 	'icon'  => '&#127979;',
-	'label' => __( 'Classes',   'noor-tms' ),
-	'url'   => home_url( '/tms-classes/' ),
+	'label' => __( 'Categories',   'noor-tms' ),
+	'url'   => home_url( '/tms-categories/' ),
 ];
 
 $nav_items['results'] = [

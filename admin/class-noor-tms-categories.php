@@ -63,6 +63,7 @@ class Categories {
 		if ( $filter ) {
 			$args['account_type'] = $filter;
 		}
+		$args['include_inactive'] = true;
 
 		$categories = DatabaseHandler::get_categories( $args );
 		$parents    = [];
@@ -97,7 +98,11 @@ class Categories {
 					<tr>
 						<th><?php esc_html_e( 'Name', 'noor-tms' ); ?></th>
 						<th><?php esc_html_e( 'Type', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'School', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Status', 'noor-tms' ); ?></th>
 						<th><?php esc_html_e( 'Parent', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Max Marks', 'noor-tms' ); ?></th>
+						<th><?php esc_html_e( 'Pass Marks', 'noor-tms' ); ?></th>
 						<th><?php esc_html_e( 'Order', 'noor-tms' ); ?></th>
 						<th><?php esc_html_e( 'Actions', 'noor-tms' ); ?></th>
 					</tr>
@@ -113,6 +118,8 @@ class Categories {
 							$parent_id = (int) $cat['parent_id'];
 							$parent_name = $parent_id ? ( $parents[ $parent_id ] ?? '' ) : '';
 							$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
+							$school_label = ! empty( $cat['is_school_type'] ) ? __( 'School', 'noor-tms' ) : __( 'Course', 'noor-tms' );
+							$status_label = ! empty( $cat['is_active'] ) ? __( 'Active', 'noor-tms' ) : __( 'Inactive', 'noor-tms' );
 							$edit_url = add_query_arg( [
 								'page' => 'noor-tms-categories',
 								'action' => 'edit',
@@ -135,7 +142,11 @@ class Categories {
 									<?php echo esc_html( $cat['name'] ); ?>
 								</td>
 								<td><?php echo esc_html( $type_label ); ?></td>
+								<td><?php echo esc_html( $school_label ); ?></td>
+								<td><?php echo esc_html( $status_label ); ?></td>
 								<td><?php echo esc_html( $parent_name ?: '—' ); ?></td>
+								<td><?php echo esc_html( (string) ( $cat['max_marks'] ?? 0 ) ); ?></td>
+								<td><?php echo esc_html( (string) ( $cat['pass_marks'] ?? 0 ) ); ?></td>
 								<td><?php echo esc_html( (string) ( $cat['sort_order'] ?? 0 ) ); ?></td>
 								<td>
 									<a class="button button-small" href="<?php echo esc_url( $edit_url ); ?>">
@@ -168,7 +179,10 @@ class Categories {
 		$scope = $this->get_account_type_scope();
 		$account_type = $scope ? $scope : ( $category['account_type'] ?? 'banin' );
 
-		$parent_args = [ 'account_type' => $account_type, 'parent_id' => 0 ];
+		$parent_args = [ 'parent_id' => 0, 'include_inactive' => true ];
+		if ( $scope ) {
+			$parent_args['account_type'] = $account_type;
+		}
 		$parents = DatabaseHandler::get_categories( $parent_args );
 		if ( $category_id ) {
 			$parents = array_values( array_filter( $parents, fn( $p ) => (int) $p['id'] !== $category_id ) );
@@ -218,6 +232,30 @@ class Categories {
 
 						<tr>
 							<th scope="row">
+								<label for="is_school_type"><?php esc_html_e( 'School Type', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<label>
+									<input type="checkbox" id="is_school_type" name="is_school_type" value="1" <?php checked( ! empty( $category['is_school_type'] ) ); ?> />
+									<?php esc_html_e( 'Treat this as a school-type category', 'noor-tms' ); ?>
+								</label>
+							</td>
+						</tr>
+
+						<tr>
+							<th scope="row">
+								<label for="is_active"><?php esc_html_e( 'Active', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<select id="is_active" name="is_active">
+									<option value="1" <?php selected( (int) ( $category['is_active'] ?? 1 ), 1 ); ?>><?php esc_html_e( 'Yes', 'noor-tms' ); ?></option>
+									<option value="0" <?php selected( (int) ( $category['is_active'] ?? 1 ), 0 ); ?>><?php esc_html_e( 'No', 'noor-tms' ); ?></option>
+								</select>
+							</td>
+						</tr>
+
+						<tr>
+							<th scope="row">
 								<label for="parent_id"><?php esc_html_e( 'Parent Category', 'noor-tms' ); ?></label>
 							</th>
 							<td>
@@ -231,6 +269,26 @@ class Categories {
 										</option>
 									<?php endforeach; ?>
 								</select>
+							</td>
+						</tr>
+
+						<tr>
+							<th scope="row">
+								<label for="max_marks"><?php esc_html_e( 'Max Marks', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<input type="number" step="0.01" min="0" id="max_marks" name="max_marks" class="small-text"
+									value="<?php echo esc_attr( (string) ( $category['max_marks'] ?? '' ) ); ?>" />
+							</td>
+						</tr>
+
+						<tr>
+							<th scope="row">
+								<label for="pass_marks"><?php esc_html_e( 'Pass Marks', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<input type="number" step="0.01" min="0" id="pass_marks" name="pass_marks" class="small-text"
+									value="<?php echo esc_attr( (string) ( $category['pass_marks'] ?? '' ) ); ?>" />
 							</td>
 						</tr>
 
@@ -266,6 +324,7 @@ class Categories {
 					(function() {
 						const accountType = document.getElementById('account_type');
 						const parent = document.getElementById('parent_id');
+						const schoolType = document.getElementById('is_school_type');
 						if (!accountType || !parent) return;
 						const options = Array.from(parent.options);
 						function syncParents() {
@@ -281,8 +340,15 @@ class Categories {
 							if (parent.selectedOptions[0] && parent.selectedOptions[0].hidden) {
 								parent.value = '0';
 							}
+							if (schoolType && parent.value !== '0') {
+								schoolType.checked = false;
+								schoolType.disabled = true;
+							} else if (schoolType) {
+								schoolType.disabled = false;
+							}
 						}
 						accountType.addEventListener('change', syncParents);
+						parent.addEventListener('change', syncParents);
 						syncParents();
 					})();
 					</script>
@@ -302,11 +368,15 @@ class Categories {
 		}
 
 		$data = [
-			'name'         => sanitize_text_field( $_POST['name'] ?? '' ),
-			'account_type' => sanitize_key( $_POST['account_type'] ?? '' ),
-			'parent_id'    => (int) ( $_POST['parent_id'] ?? 0 ),
-			'sort_order'   => (int) ( $_POST['sort_order'] ?? 0 ),
-			'description'  => sanitize_textarea_field( $_POST['description'] ?? '' ),
+			'name'           => sanitize_text_field( $_POST['name'] ?? '' ),
+			'account_type'   => sanitize_key( $_POST['account_type'] ?? '' ),
+			'parent_id'      => (int) ( $_POST['parent_id'] ?? 0 ),
+			'is_school_type' => ! empty( $_POST['is_school_type'] ) ? 1 : 0,
+			'is_active'      => (int) ( $_POST['is_active'] ?? 1 ),
+			'max_marks'      => (float) ( $_POST['max_marks'] ?? 0 ),
+			'pass_marks'     => (float) ( $_POST['pass_marks'] ?? 0 ),
+			'sort_order'     => (int) ( $_POST['sort_order'] ?? 0 ),
+			'description'    => sanitize_textarea_field( $_POST['description'] ?? '' ),
 		];
 
 		if ( $category_id > 0 ) {

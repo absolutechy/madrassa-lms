@@ -18,6 +18,9 @@ $active_nav     = 'students';
 $topbar_actions = '<a href="' . esc_url( home_url( '/tms-students/' ) ) . '" class="noor-btn noor-btn--secondary">'
 	. '&larr; ' . esc_html__( 'Back to Students', 'noor-tms' ) . '</a>';
 $print_url      = '';
+$selected_category_id    = (int) ( $student['category_id'] ?? 0 );
+$selected_subcategory_id = (int) ( $student['subcategory_id'] ?? 0 );
+$selected_class_id       = (int) ( $student['class_id'] ?? 0 );
 
 if ( $is_edit && $student_id > 0 ) {
 	$print_url = wp_nonce_url(
@@ -66,40 +69,27 @@ include __DIR__ . '/layout.php';
 		<div class="noor-form-row">
 			<div class="noor-form-group">
 				<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
-				<?php if ( empty( $parent_categories ) ) : ?>
-					<p class="noor-form-description"><?php esc_html_e( 'No categories found yet.', 'noor-tms' ); ?></p>
-				<?php else : ?>
-					<select id="category_id" name="category_id">
-						<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
-						<?php foreach ( $parent_categories as $cat ) : ?>
-							<?php
-							$label = $cat['name'];
-							if ( $has_mixed_category_types ) {
-								$type_label = ( 'banaat' === $cat['account_type'] ) ? __( 'Banaat', 'noor-tms' ) : __( 'Banin', 'noor-tms' );
-								$label = $type_label . ' - ' . $label;
-							}
-							?>
-							<option value="<?php echo esc_attr( $cat['id'] ); ?>" <?php selected( (int) ( $student['category_id'] ?? 0 ), (int) $cat['id'] ); ?>>
-								<?php echo esc_html( $label ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-				<?php endif; ?>
+				<select id="category_id" name="category_id" data-selected="<?php echo esc_attr( (string) $selected_category_id ); ?>">
+					<option value="0"><?php esc_html_e( 'Loading categories…', 'noor-tms' ); ?></option>
+				</select>
 			</div>
 
 			<div class="noor-form-group">
 				<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
-				<select id="subcategory_id" name="subcategory_id">
-					<option value="0"><?php esc_html_e( '— Select Sub-Category —', 'noor-tms' ); ?></option>
-					<?php foreach ( $subcategories as $subcat ) : ?>
-						<option value="<?php echo esc_attr( $subcat['id'] ); ?>"
-							data-parent="<?php echo esc_attr( $subcat['parent_id'] ); ?>"
-							<?php selected( (int) ( $student['subcategory_id'] ?? 0 ), (int) $subcat['id'] ); ?>>
-							<?php echo esc_html( $subcat['name'] ); ?>
-						</option>
-					<?php endforeach; ?>
+				<select id="subcategory_id" name="subcategory_id" data-selected="<?php echo esc_attr( (string) $selected_subcategory_id ); ?>" disabled>
+					<option value="0"><?php esc_html_e( 'Select a category first', 'noor-tms' ); ?></option>
 				</select>
 				<p class="noor-form-description"><?php esc_html_e( 'Optional. Choose a sub-category under the selected category.', 'noor-tms' ); ?></p>
+			</div>
+		</div>
+
+		<div class="noor-form-row">
+			<div class="noor-form-group" id="class_group" hidden>
+				<label for="class_id"><?php esc_html_e( 'Class', 'noor-tms' ); ?></label>
+				<select id="class_id" name="class_id" data-selected="<?php echo esc_attr( (string) $selected_class_id ); ?>" disabled>
+					<option value="0"><?php esc_html_e( 'Select a sub-category first', 'noor-tms' ); ?></option>
+				</select>
+				<p class="noor-form-description"><?php esc_html_e( 'Shown only for school-type categories.', 'noor-tms' ); ?></p>
 			</div>
 		</div>
 
@@ -198,34 +188,124 @@ include __DIR__ . '/layout.php';
 (function() {
 	const category = document.getElementById('category_id');
 	const subcategory = document.getElementById('subcategory_id');
-	if (!category || !subcategory) return;
-	const options = Array.from(subcategory.options);
-	function syncSubcategories() {
-		const parentId = category.value;
-		let hasMatch = false;
-		options.forEach(option => {
-			if (!option.value) {
-				option.hidden = false;
-				return;
-			}
-			const match = option.dataset.parent === parentId;
-			option.hidden = !match;
-			if (match) hasMatch = true;
+	const classGroup = document.getElementById('class_group');
+	const classSelect = document.getElementById('class_id');
+	if (!category || !subcategory || !classGroup || !classSelect) return;
+
+	const ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+	const ajaxNonce = '<?php echo esc_js( wp_create_nonce( 'noor_tms_ajax' ) ); ?>';
+
+	const selectedCategory = parseInt(category.dataset.selected || '0', 10) || 0;
+	const selectedSubcategory = parseInt(subcategory.dataset.selected || '0', 10) || 0;
+	const selectedClass = parseInt(classSelect.dataset.selected || '0', 10) || 0;
+	let categoryMap = {};
+	let subcategoryMap = {};
+
+	function post(action, data) {
+		const payload = Object.assign({ action: action, nonce: ajaxNonce }, data || {});
+		const body = Object.keys(payload).map(function(key) {
+			return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+		}).join('&');
+		return fetch(ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body
+		}).then(response => response.json());
+	}
+
+	function renderOptions(select, rows, placeholder, valueKey, labelKey) {
+		select.innerHTML = '';
+		const first = document.createElement('option');
+		first.value = '0';
+		first.textContent = placeholder;
+		select.appendChild(first);
+		rows.forEach(row => {
+			const option = document.createElement('option');
+			option.value = String(row[valueKey]);
+			option.textContent = row[labelKey];
+			select.appendChild(option);
 		});
-		if (!parentId || !hasMatch) {
-			if (subcategory.value && subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
-				subcategory.value = '0';
-			}
-			subcategory.disabled = true;
-			return;
-		}
-		subcategory.disabled = false;
-		if (subcategory.selectedOptions[0] && subcategory.selectedOptions[0].hidden) {
-			subcategory.value = '0';
+	}
+
+	async function loadCategories() {
+		const response = await post('noor_tms_get_categories', {});
+		const rows = (response && response.success && response.data && response.data.categories) ? response.data.categories : [];
+		categoryMap = {};
+		rows.forEach(row => { categoryMap[String(row.id)] = row; });
+		renderOptions(category, rows, '<?php echo esc_js( __( '— Select Category —', 'noor-tms' ) ); ?>', 'id', 'name');
+		category.disabled = false;
+		if (selectedCategory && category.querySelector('option[value="' + selectedCategory + '"]')) {
+			category.value = String(selectedCategory);
 		}
 	}
-	category.addEventListener('change', syncSubcategories);
-	syncSubcategories();
+
+	async function loadSubcategories(categoryId, preferredSubcategory) {
+		const response = await post('noor_tms_get_subcategories', { parent_id: categoryId });
+		const rows = (response && response.success && response.data && response.data.subcategories) ? response.data.subcategories : [];
+		subcategoryMap = {};
+		rows.forEach(row => { subcategoryMap[String(row.id)] = row; });
+		renderOptions(subcategory, rows, '<?php echo esc_js( __( '— Select Sub-Category —', 'noor-tms' ) ); ?>', 'id', 'name');
+		subcategory.disabled = !rows.length;
+		if (preferredSubcategory && subcategory.querySelector('option[value="' + preferredSubcategory + '"]')) {
+			subcategory.value = String(preferredSubcategory);
+		}
+	}
+
+	async function loadClasses(subcategoryId, preferredClass) {
+		const response = await post('noor_tms_get_classes', { subcategory_id: subcategoryId });
+		const rows = (response && response.success && response.data && response.data.classes) ? response.data.classes : [];
+		renderOptions(classSelect, rows, '<?php echo esc_js( __( '— Select Class —', 'noor-tms' ) ); ?>', 'id', 'name');
+			classSelect.disabled = !rows.length;
+			classGroup.hidden = !rows.length;
+		if (preferredClass && classSelect.querySelector('option[value="' + preferredClass + '"]')) {
+			classSelect.value = String(preferredClass);
+		}
+	}
+
+	function syncVisibility() {
+		const cat = categoryMap[String(category.value)] || null;
+		const sub = subcategoryMap[String(subcategory.value)] || null;
+		const isSchool = cat ? !!parseInt(cat.is_school_type || '0', 10) : false;
+		if (!isSchool) {
+				classGroup.hidden = true;
+			classSelect.value = '0';
+			classSelect.disabled = true;
+			return;
+		}
+		if (sub) {
+			classGroup.hidden = false;
+			classSelect.disabled = false;
+		}
+	}
+
+	category.addEventListener('change', async function() {
+		await loadSubcategories(category.value, 0);
+		subcategory.value = '0';
+		await loadClasses(0, 0);
+		syncVisibility();
+	});
+
+	subcategory.addEventListener('change', async function() {
+		const cat = categoryMap[String(category.value)] || null;
+		if (!cat || !parseInt(cat.is_school_type || '0', 10)) {
+			classGroup.hidden = true;
+			classSelect.value = '0';
+			return;
+		}
+		await loadClasses(subcategory.value, 0);
+		syncVisibility();
+	});
+
+	(async function init() {
+		await loadCategories();
+		if (selectedCategory) {
+			await loadSubcategories(selectedCategory, selectedSubcategory);
+			if (selectedSubcategory) {
+				await loadClasses(selectedSubcategory, selectedClass);
+			}
+		}
+		syncVisibility();
+	})();
 })();
 </script>
 

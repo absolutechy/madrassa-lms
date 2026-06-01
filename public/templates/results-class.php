@@ -5,6 +5,8 @@
  * Variables in scope:
  *   $class      array   Class row.
  *   $class_id   int
+ *   $category   array|null Category context.
+ *   $subcategory array|null Sub-category context.
  *   $student_id int     Pre-selected student (optional).
  *   $exam_date  string  Selected exam date filter (optional).
  *   $action     string  'list' or 'add'.
@@ -25,19 +27,38 @@ use Noor_TMS\Admin\WhatsApp;
 if ( 'add' === $action ) {
 $page_title     = esc_html__( 'Add Exam Results', 'noor-tms' ) . ' — ' . esc_html( $class['name'] );
 $active_nav     = 'results';
-$topbar_actions = '<a href="' . esc_url( add_query_arg( [ 'class_id' => $class_id ], home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--secondary">'
+$back_args = [ 'class_id' => $class_id ];
+if ( ! empty( $category['id'] ) ) {
+   $back_args['category_id'] = (int) $category['id'];
+}
+if ( ! empty( $subcategory['id'] ) ) {
+   $back_args['subcategory_id'] = (int) $subcategory['id'];
+}
+$topbar_actions = '<a href="' . esc_url( add_query_arg( $back_args, home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--secondary">'
 . '&larr; ' . esc_html__( 'Back to Results', 'noor-tms' ) . '</a>';
 } elseif ( $exam_date ) {
 $page_title     = esc_html( $class['name'] ) . ' — ' . date_i18n( get_option( 'date_format' ), strtotime( $exam_date ) );
 $active_nav     = 'results';
-$topbar_actions = '<a href="' . esc_url( add_query_arg( [ 'class_id' => $class_id ], home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--secondary">'
+$topbar_actions = '<a href="' . esc_url( add_query_arg( $back_args ?? [ 'class_id' => $class_id ], home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--secondary">'
 . '&larr; ' . esc_html__( 'Back to Dates', 'noor-tms' ) . '</a>';
 $topbar_actions .= '<a href="' . esc_url( add_query_arg( [ 'class_id' => $class_id, 'tms_action' => 'add' ], home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--primary">+ ' . esc_html__( 'Add Exam Results', 'noor-tms' ) . '</a>';
 } else {
 $page_title     = esc_html( $class['name'] ) . ' — ' . __( 'Exam Results', 'noor-tms' );
 $active_nav     = 'results';
-$topbar_actions = '<a href="' . esc_url( home_url( '/tms-results/' ) ) . '" class="noor-btn noor-btn--secondary">'
-. '&larr; ' . esc_html__( 'All Classes', 'noor-tms' ) . '</a>';
+$back_url = add_query_arg(
+   array_filter(
+      [
+         'category_id'    => (int) ( $category['id'] ?? 0 ),
+         'subcategory_id' => empty( $category['is_school_type'] ) ? 0 : (int) ( $subcategory['id'] ?? 0 ),
+      ]
+   ),
+   home_url( '/tms-results/' )
+);
+$back_label = empty( $category['is_school_type'] )
+   ? esc_html__( 'Back to Sub-Categories', 'noor-tms' )
+   : esc_html__( 'Back to Classes', 'noor-tms' );
+$topbar_actions = '<a href="' . esc_url( $back_url ) . '" class="noor-btn noor-btn--secondary">'
+. '&larr; ' . $back_label . '</a>';
 $topbar_actions .= '<a href="' . esc_url( add_query_arg( [ 'class_id' => $class_id, 'tms_action' => 'add' ], home_url( '/tms-results/' ) ) ) . '" class="noor-btn noor-btn--primary">+ ' . esc_html__( 'Add Exam Results', 'noor-tms' ) . '</a>';
 }
 

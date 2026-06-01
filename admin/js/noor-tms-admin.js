@@ -165,7 +165,7 @@
     // -----------------------------------------------------------------------
     // 5.  Subject row management (class create / edit form)
     // -----------------------------------------------------------------------
-    $( '#noor-add-subject' ).on( 'click', function () {
+    $( document ).on( 'click', '#noor-add-subject', function () {
         const $row = $(
             '<div class="noor-subject-row">' +
                 '<input type="text" name="subjects[]" class="regular-text noor-subject-input"' +

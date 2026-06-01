@@ -49,6 +49,7 @@ class Classes {
 
 	private function page_list(): void {
 		$classes = DatabaseHandler::get_classes();
+		$categories = DatabaseHandler::get_categories( [ 'parent_id' => 0, 'include_inactive' => true ] );
 		?>
 		<div class="wrap noor-tms-wrap">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Classes', 'noor-tms' ); ?></h1>
@@ -87,6 +88,26 @@ class Classes {
 									); ?>
 								</span>
 							</div>
+							<?php if ( ! empty( $cls['category_id'] ) || ! empty( $cls['subcategory_id'] ) ) : ?>
+								<p class="description">
+									<?php
+									$parts = [];
+									if ( ! empty( $cls['category_id'] ) ) {
+										$cat = DatabaseHandler::get_category( (int) $cls['category_id'] );
+										if ( $cat ) {
+											$parts[] = $cat['name'];
+										}
+									}
+									if ( ! empty( $cls['subcategory_id'] ) ) {
+										$sub = DatabaseHandler::get_category( (int) $cls['subcategory_id'] );
+										if ( $sub ) {
+											$parts[] = $sub['name'];
+										}
+									}
+									echo esc_html( implode( ' / ', $parts ) );
+									?>
+								</p>
+							<?php endif; ?>
 
 							<?php if ( ! empty( $subjects ) ) : ?>
 								<ul class="noor-subject-tags">
@@ -125,6 +146,9 @@ class Classes {
 	private function page_form( int $class_id ): void {
 		$cls      = $class_id ? DatabaseHandler::get_class( $class_id ) : null;
 		$subjects = $class_id ? DatabaseHandler::get_subjects_by_class( $class_id ) : [];
+		$categories = DatabaseHandler::get_categories( [ 'parent_id' => 0, 'include_inactive' => true ] );
+		$selected_category_id = (int) ( $cls['category_id'] ?? (int) ( $_GET['category_id'] ?? 0 ) );
+		$selected_subcategory_id = (int) ( $cls['subcategory_id'] ?? (int) ( $_GET['subcategory_id'] ?? 0 ) );
 		$title    = $cls ? __( 'Edit Class', 'noor-tms' ) : __( 'Add New Class', 'noor-tms' );
 		?>
 		<div class="wrap noor-tms-wrap">
@@ -148,6 +172,31 @@ class Classes {
 									value="<?php echo esc_attr( $cls['name'] ?? '' ); ?>"
 									class="regular-text"
 									placeholder="<?php esc_attr_e( 'e.g. Class Hifz 1', 'noor-tms' ); ?>" />
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="category_id"><?php esc_html_e( 'Category', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<select id="category_id" name="category_id" class="regular-text" data-selected="<?php echo esc_attr( (string) $selected_category_id ); ?>">
+									<option value="0"><?php esc_html_e( '— Select Category —', 'noor-tms' ); ?></option>
+									<?php foreach ( $categories as $cat ) : ?>
+										<option value="<?php echo esc_attr( (int) $cat['id'] ); ?>" <?php selected( $selected_category_id, (int) $cat['id'] ); ?>>
+											<?php echo esc_html( $cat['name'] ); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="subcategory_id"><?php esc_html_e( 'Sub-Category', 'noor-tms' ); ?></label>
+							</th>
+							<td>
+								<select id="subcategory_id" name="subcategory_id" class="regular-text" data-selected="<?php echo esc_attr( (string) $selected_subcategory_id ); ?>" disabled>
+									<option value="0"><?php esc_html_e( 'Select a category first', 'noor-tms' ); ?></option>
+								</select>
 							</td>
 						</tr>
 						<tr>
@@ -200,6 +249,61 @@ class Classes {
 						</a>
 					</div>
 				</form>
+				<script>
+				(function() {
+					const category = document.getElementById('category_id');
+					const subcategory = document.getElementById('subcategory_id');
+					if (!category || !subcategory) return;
+
+					const ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+					const ajaxNonce = '<?php echo esc_js( wp_create_nonce( 'noor_tms_ajax' ) ); ?>';
+
+					const selectedCategory = parseInt(category.dataset.selected || '0', 10) || 0;
+					const selectedSubcategory = parseInt(subcategory.dataset.selected || '0', 10) || 0;
+
+					function post(action, data) {
+						const payload = Object.assign({ action: action, nonce: ajaxNonce }, data || {});
+						const body = Object.keys(payload).map(function(key) {
+							return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+						}).join('&');
+						return fetch(ajaxUrl, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+							body: body
+						}).then(function(response) { return response.json(); });
+					}
+
+					async function loadSubcategories(parentId, preferred) {
+						const response = await post('noor_tms_get_subcategories', { parent_id: parentId });
+						const rows = (response && response.success && response.data && response.data.subcategories) ? response.data.subcategories : [];
+						subcategory.innerHTML = '';
+						const first = document.createElement('option');
+						first.value = '0';
+						first.textContent = '<?php echo esc_js( __( '— Select Sub-Category —', 'noor-tms' ) ); ?>';
+						subcategory.appendChild(first);
+						rows.forEach(function(row) {
+							const option = document.createElement('option');
+							option.value = String(row.id);
+							option.textContent = row.name;
+							subcategory.appendChild(option);
+						});
+						subcategory.disabled = !rows.length;
+						if (preferred && subcategory.querySelector('option[value="' + preferred + '"]')) {
+							subcategory.value = String(preferred);
+						}
+					}
+
+					category.addEventListener('change', function() {
+						loadSubcategories(category.value, 0);
+					});
+
+					(async function init() {
+						if (selectedCategory) {
+							await loadSubcategories(selectedCategory, selectedSubcategory);
+						}
+					})();
+				})();
+				</script>
 			</div>
 		</div>
 		<?php
@@ -215,6 +319,8 @@ class Classes {
 		}
 
 		$name     = sanitize_text_field( $_POST['class_name'] ?? '' );
+		$category_id = (int) ( $_POST['category_id'] ?? 0 );
+		$subcategory_id = (int) ( $_POST['subcategory_id'] ?? 0 );
 		$subjects = array_filter(
 			array_map( 'sanitize_text_field', (array) ( $_POST['subjects'] ?? [] ) )
 		);
@@ -224,10 +330,16 @@ class Classes {
 		}
 
 		if ( $class_id > 0 ) {
-			DatabaseHandler::update_class( $class_id, $name, array_values( $subjects ) );
+			DatabaseHandler::update_class( $class_id, $name, array_values( $subjects ), [
+				'category_id'    => $category_id,
+				'subcategory_id' => $subcategory_id,
+			] );
 			$msg = 'class_updated';
 		} else {
-			DatabaseHandler::insert_class( $name, array_values( $subjects ) );
+			DatabaseHandler::insert_class( $name, array_values( $subjects ), [
+				'category_id'    => $category_id,
+				'subcategory_id' => $subcategory_id,
+			] );
 			$msg = 'class_added';
 		}
 

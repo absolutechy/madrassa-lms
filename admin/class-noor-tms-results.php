@@ -30,72 +30,275 @@ class Results {
 			wp_die( esc_html__( 'Insufficient permissions.', 'noor-tms' ) );
 		}
 
+		$category_id    = (int) ( $_GET['category_id'] ?? 0 );
+		$subcategory_id = (int) ( $_GET['subcategory_id'] ?? 0 );
 		$class_id = (int) ( $_GET['class_id'] ?? 0 );
 
 		if ( $class_id ) {
-			$this->page_class_results( $class_id );
+			$this->page_class_results( $class_id, $category_id, $subcategory_id );
 		} else {
-			$this->page_class_overview();
+			$this->page_results_index( $category_id, $subcategory_id );
 		}
 	}
 
 	// -----------------------------------------------------------------------
-	// Class overview (landing page)
+	// Category / sub-category overview (landing page)
 	// -----------------------------------------------------------------------
 
-	private function page_class_overview(): void {
-		$classes = DatabaseHandler::get_classes();
+	private function page_results_index( int $category_id, int $subcategory_id ): void {
+		$visible_scopes = $this->get_visible_scopes();
+		$category       = $category_id ? DatabaseHandler::get_category( $category_id ) : null;
+		$subcategory    = $subcategory_id ? DatabaseHandler::get_category( $subcategory_id ) : null;
+		$allowed_class_ids = [];
 		?>
 		<div class="wrap noor-tms-wrap">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Exam Results', 'noor-tms' ); ?></h1>
 			<hr class="wp-header-end">
 
-			<?php if ( empty( $classes ) ) : ?>
-				<div class="noor-tms-card">
-					<p>
-						<?php
-						printf(
-							/* translators: %s: link to create class */
-							esc_html__( 'No classes found. %s first, then add students to it.', 'noor-tms' ),
-							'<a href="' . esc_url( add_query_arg( [ 'page' => 'noor-tms-classes', 'action' => 'new' ], admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Create a class', 'noor-tms' ) . '</a>'
-						);
-						?>
-					</p>
-				</div>
+			<?php if ( $subcategory ) : ?>
+				<?php
+				$classes = $this->get_visible_classes_for_context( $category_id, $subcategory_id, $allowed_class_ids, $subcategory['account_type'] ?? null );
+				$back_args = [ 'page' => 'noor-tms-results' ];
+				if ( ! empty( $category['id'] ) ) {
+					$back_args['category_id'] = (int) $category['id'];
+				}
+				?>
+				<p class="noor-breadcrumb">
+					<a href="<?php echo esc_url( add_query_arg( $back_args, admin_url( 'admin.php' ) ) ); ?>">
+						&larr; <?php esc_html_e( 'Back to Sub-Categories', 'noor-tms' ); ?>
+					</a>
+				</p>
+				<h2 style="margin-top:0;"><?php echo esc_html( $subcategory['name'] ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Choose a course or class to enter exam results.', 'noor-tms' ); ?></p>
+				<?php if ( empty( $classes ) ) : ?>
+					<div class="noor-tms-card">
+						<p><?php esc_html_e( 'No classes are available in this sub-category yet.', 'noor-tms' ); ?></p>
+					</div>
+				<?php else : ?>
+					<div class="noor-class-grid">
+						<?php foreach ( $classes as $cls ) : ?>
+							<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'noor-tms-results', 'class_id' => $cls['id'], 'category_id' => $category_id, 'subcategory_id' => $subcategory_id ], admin_url( 'admin.php' ) ) ); ?>"
+							   class="noor-class-card noor-class-card--link">
+								<div class="noor-class-card__header">
+									<h3 class="noor-class-card__name"><?php echo esc_html( $cls['name'] ); ?></h3>
+									<span class="noor-class-card__meta">
+										<?php echo esc_html( sprintf( _n( '%d subject', '%d subjects', (int) $cls['subject_count'], 'noor-tms' ), (int) $cls['subject_count'] ) ); ?>
+									</span>
+								</div>
+								<span class="noor-class-card__cta"><?php esc_html_e( 'View Results →', 'noor-tms' ); ?></span>
+							</a>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+			<?php elseif ( $category ) : ?>
+				<?php $subcategories = $this->get_visible_subcategories_for_category( $category_id, $allowed_class_ids, $category['account_type'] ?? null ); ?>
+				<p class="noor-breadcrumb">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms-results' ) ); ?>">
+						&larr; <?php esc_html_e( 'All Categories', 'noor-tms' ); ?>
+					</a>
+				</p>
+				<h2 style="margin-top:0;"><?php echo esc_html( $category['name'] ); ?></h2>
+				<p class="description"><?php echo esc_html( ! empty( $category['is_school_type'] ) ? __( 'Choose a sub-category to continue to the classes available for results.', 'noor-tms' ) : __( 'Choose a course to open the result entry form.', 'noor-tms' ) ); ?></p>
+				<?php if ( empty( $subcategories ) ) : ?>
+					<div class="noor-tms-card">
+						<p><?php esc_html_e( 'No sub-categories are available for this category.', 'noor-tms' ); ?></p>
+					</div>
+				<?php else : ?>
+					<div class="noor-class-grid">
+						<?php foreach ( $subcategories as $item ) : ?>
+							<?php $subcat = $item['subcategory']; ?>
+							<?php
+							$subcat_url = add_query_arg( [ 'page' => 'noor-tms-results', 'category_id' => $category_id, 'subcategory_id' => $subcat['id'] ], admin_url( 'admin.php' ) );
+							if ( empty( $category['is_school_type'] ) && ! empty( $item['classes'][0]['id'] ) ) {
+								$subcat_url = add_query_arg(
+									[
+										'page'           => 'noor-tms-results',
+										'class_id'       => (int) $item['classes'][0]['id'],
+										'category_id'    => $category_id,
+										'subcategory_id' => (int) $subcat['id'],
+									],
+									admin_url( 'admin.php' )
+								);
+							}
+							?>
+							<a href="<?php echo esc_url( $subcat_url ); ?>"
+							   class="noor-class-card noor-class-card--link">
+								<div class="noor-class-card__header">
+									<h3 class="noor-class-card__name"><?php echo esc_html( $subcat['name'] ); ?></h3>
+									<span class="noor-class-card__meta">
+										<?php echo esc_html( sprintf( _n( '%d class', '%d classes', count( $item['classes'] ), 'noor-tms' ), count( $item['classes'] ) ) ); ?>
+									</span>
+								</div>
+								<span class="noor-class-card__cta">
+									<?php echo esc_html( ! empty( $category['is_school_type'] ) ? __( 'View Classes →', 'noor-tms' ) : __( 'Open Results →', 'noor-tms' ) ); ?>
+								</span>
+							</a>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
 			<?php else : ?>
 				<p class="description" style="margin-bottom:12px;">
-					<?php esc_html_e( 'Select a class to view and add exam results.', 'noor-tms' ); ?>
+					<?php esc_html_e( 'Select a category to continue to its sub-categories and classes.', 'noor-tms' ); ?>
 				</p>
-				<div class="noor-class-grid">
-					<?php foreach ( $classes as $cls ) : ?>
-						<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'noor-tms-results', 'class_id' => $cls['id'] ], admin_url( 'admin.php' ) ) ); ?>"
-						   class="noor-class-card noor-class-card--link">
-							<div class="noor-class-card__header">
-								<h3 class="noor-class-card__name"><?php echo esc_html( $cls['name'] ); ?></h3>
-								<span class="noor-class-card__meta">
-									<?php echo esc_html(
-										sprintf(
-											/* translators: %d: number of subjects */
-											_n( '%d subject', '%d subjects', (int) $cls['subject_count'], 'noor-tms' ),
-											(int) $cls['subject_count']
-										)
-									); ?>
-								</span>
+				<?php $categories_by_scope = $this->get_visible_categories_by_scope( $visible_scopes, $allowed_class_ids ); ?>
+				<?php if ( empty( $categories_by_scope ) ) : ?>
+					<div class="noor-tms-card">
+						<p>
+							<?php
+							printf(
+								/* translators: %s: link to categories page */
+								esc_html__( 'No categories found. %s first, then add classes under them.', 'noor-tms' ),
+								'<a href="' . esc_url( add_query_arg( [ 'page' => 'noor-tms-categories' ], admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Create a category', 'noor-tms' ) . '</a>'
+							);
+							?>
+						</p>
+					</div>
+				<?php else : ?>
+					<?php foreach ( $categories_by_scope as $scope => $items ) : ?>
+						<div class="noor-tms-card" style="margin-bottom:20px;">
+							<h2 style="margin-top:0;">
+								<?php echo esc_html( 'banin' === $scope ? __( 'Banin Categories', 'noor-tms' ) : ( 'banaat' === $scope ? __( 'Banaat Categories', 'noor-tms' ) : __( 'Categories', 'noor-tms' ) ) ); ?>
+							</h2>
+							<div class="noor-class-grid">
+								<?php foreach ( $items as $item ) : ?>
+									<?php $cat = $item['category']; ?>
+									<a href="<?php echo esc_url( add_query_arg( [ 'page' => 'noor-tms-results', 'category_id' => $cat['id'] ], admin_url( 'admin.php' ) ) ); ?>"
+									   class="noor-class-card noor-class-card--link">
+										<div class="noor-class-card__header">
+											<h3 class="noor-class-card__name"><?php echo esc_html( $cat['name'] ); ?></h3>
+											<span class="noor-class-card__meta">
+												<?php echo esc_html( sprintf( _n( '%d sub-category', '%d sub-categories', count( $item['subcategories'] ), 'noor-tms' ), count( $item['subcategories'] ) ) ); ?>
+											</span>
+										</div>
+										<span class="noor-class-card__cta"><?php esc_html_e( 'Open Category →', 'noor-tms' ); ?></span>
+									</a>
+								<?php endforeach; ?>
 							</div>
-							<span class="noor-class-card__cta"><?php esc_html_e( 'View Results →', 'noor-tms' ); ?></span>
-						</a>
+						</div>
 					<?php endforeach; ?>
-				</div>
+				<?php endif; ?>
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Return the account-type scopes visible to the current user.
+	 *
+	 * @return array<int, string|null>
+	 */
+	private function get_visible_scopes(): array {
+		if ( current_user_can( 'manage_options' ) || ( current_user_can( 'manage_banin' ) && current_user_can( 'manage_banaat' ) ) ) {
+			return [ 'banin', 'banaat' ];
+		}
+		if ( current_user_can( 'manage_banin' ) ) {
+			return [ 'banin' ];
+		}
+		if ( current_user_can( 'manage_banaat' ) ) {
+			return [ 'banaat' ];
+		}
+		return [ null ];
+	}
+
+	/**
+	 * Filter a class list to the classes the current user may see.
+	 *
+	 * @param array<int, array<string, mixed>> $classes
+	 * @param array<int, int>                  $allowed_class_ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function filter_visible_classes( array $classes, array $allowed_class_ids ): array {
+		if ( empty( $allowed_class_ids ) ) {
+			return $classes;
+		}
+
+		return array_values(
+			array_filter(
+				$classes,
+				static fn( array $class ): bool => in_array( (int) $class['id'], $allowed_class_ids, true )
+			)
+		);
+	}
+
+	/**
+	 * Get visible root categories grouped by scope.
+	 *
+	 * @param array<int, string|null> $scopes
+	 * @param array<int, int>         $allowed_class_ids
+	 * @return array<string, array<int, array<string, mixed>>>
+	 */
+	private function get_visible_categories_by_scope( array $scopes, array $allowed_class_ids ): array {
+		$groups = [];
+		foreach ( $scopes as $scope ) {
+			$categories = DatabaseHandler::get_categories( [ 'parent_id' => 0, 'account_type' => $scope, 'include_inactive' => true ] );
+			$visible    = [];
+			foreach ( $categories as $category ) {
+				$subcategories = $this->get_visible_subcategories_for_category( (int) $category['id'], $allowed_class_ids, $scope );
+				$visible[] = [
+					'category'      => $category,
+					'subcategories' => $subcategories,
+				];
+			}
+			if ( ! empty( $visible ) ) {
+				$groups[ $scope ?? 'all' ] = $visible;
+			}
+		}
+
+		return $groups;
+	}
+
+	/**
+	 * Get sub-categories for one category, keeping only branches that contain visible classes.
+	 *
+	 * @param int                 $category_id
+	 * @param array<int, int>     $allowed_class_ids
+	 * @param string|null         $scope
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_visible_subcategories_for_category( int $category_id, array $allowed_class_ids, ?string $scope = null ): array {
+		$subcategories = DatabaseHandler::get_categories( [ 'parent_id' => $category_id, 'account_type' => $scope, 'include_inactive' => true ] );
+		$visible       = [];
+		foreach ( $subcategories as $subcategory ) {
+			$classes = $this->get_visible_classes_for_context( $category_id, (int) $subcategory['id'], $allowed_class_ids, $scope );
+			$visible[] = [
+				'subcategory' => $subcategory,
+				'classes'     => $classes,
+			];
+		}
+
+		return $visible;
+	}
+
+	/**
+	 * Get visible classes for a category/sub-category context.
+	 *
+	 * @param int                 $category_id
+	 * @param int                 $subcategory_id
+	 * @param array<int, int>     $allowed_class_ids
+	 * @param string|null         $scope
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_visible_classes_for_context( int $category_id, int $subcategory_id, array $allowed_class_ids, ?string $scope = null ): array {
+		$args = [];
+		if ( $category_id > 0 ) {
+			$args['category_id'] = $category_id;
+		}
+		if ( $subcategory_id > 0 ) {
+			$args['subcategory_id'] = $subcategory_id;
+		}
+		if ( null !== $scope ) {
+			$args['account_type'] = $scope;
+		}
+
+		$classes = DatabaseHandler::get_classes_by_context( $args );
+		return $this->filter_visible_classes( $classes, $allowed_class_ids );
 	}
 
 	// -----------------------------------------------------------------------
 	// Class results view
 	// -----------------------------------------------------------------------
 
-	private function page_class_results( int $class_id ): void {
+	private function page_class_results( int $class_id, int $category_id = 0, int $subcategory_id = 0 ): void {
 		$class = DatabaseHandler::get_class( $class_id );
 		if ( ! $class ) {
 			wp_die( esc_html__( 'Class not found.', 'noor-tms' ) );
@@ -103,6 +306,20 @@ class Results {
 
 		$exam_date = sanitize_text_field( $_GET['exam_date'] ?? '' );
 		$subjects  = DatabaseHandler::get_subjects_by_class( $class_id );
+		if ( empty( $subjects ) ) {
+			$subject_label = $class['name'] ?? '';
+			if ( empty( $subject_label ) && ! empty( $class['subcategory_id'] ) ) {
+				$subcat = DatabaseHandler::get_category( (int) $class['subcategory_id'] );
+				if ( $subcat ) {
+					$subject_label = (string) $subcat['name'];
+				}
+			}
+			if ( '' !== $subject_label ) {
+				$subjects = [
+					[ 'id' => 0, 'subject_name' => $subject_label ],
+				];
+			}
+		}
 		$students  = DatabaseHandler::get_students_dropdown( $class_id );
 		$exam_dates = DatabaseHandler::get_exam_dates_by_class( $class_id );
 		$summary   = $exam_date ? DatabaseHandler::get_results_summary_by_class( $class_id, $exam_date ) : [];
@@ -114,7 +331,7 @@ class Results {
 		<div class="wrap noor-tms-wrap">
 			<!-- Breadcrumb -->
 			<p class="noor-breadcrumb">
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms-results' ) ); ?>">
+				<a href="<?php echo esc_url( add_query_arg( array_filter( [ 'page' => 'noor-tms-results', 'category_id' => $category_id, 'subcategory_id' => $subcategory_id ] ), admin_url( 'admin.php' ) ) ); ?>">
 					&larr; <?php esc_html_e( 'All Classes', 'noor-tms' ); ?>
 				</a>
 			</p>
