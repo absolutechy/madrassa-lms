@@ -13,13 +13,13 @@
 
 declare(strict_types=1);
 
-if ( PHP_SAPI !== 'cli' ) {
+if ( PHP_SAPI !== 'cli' && ! defined( 'NOOR_TMS_ALLOW_WEB_SEED' ) ) {
 	fwrite( STDERR, "This script must be run from the command line.\n" );
 	exit( 1 );
 }
 
 $argv = $_SERVER['argv'] ?? [];
-if ( ! in_array( '--force', $argv, true ) ) {
+if ( ! defined( 'NOOR_TMS_ALLOW_WEB_SEED' ) && ! in_array( '--force', $argv, true ) ) {
 	echo "Usage: php scripts/seed-academic-data.php --force\n";
 	echo "Warning: this will delete existing Noor-TMS academic data before seeding new records.\n";
 	exit( 1 );

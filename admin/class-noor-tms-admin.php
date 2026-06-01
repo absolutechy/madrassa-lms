@@ -22,6 +22,7 @@ class Admin {
 	private Teachers   $teachers;
 	private Attendance $attendance;
 	private Fees       $fees;
+	private \Noor_TMS\Admin\Seed $seed;
 	private Support    $support;
 	private \Noor_TMS\Admin\Chat $chat;
 
@@ -34,6 +35,7 @@ class Admin {
 		$this->teachers   = new Teachers();
 		$this->attendance = new Attendance();
 		$this->fees       = new Fees();
+		$this->seed       = new \Noor_TMS\Admin\Seed();
 		$this->support    = new Support();
 		$this->chat       = new \Noor_TMS\Admin\Chat();
 	}
@@ -108,6 +110,15 @@ class Admin {
 			'noor_tms_manage',
 			'noor-tms-settings',
 			[ $this->settings, 'page_settings' ]
+		);
+
+		add_submenu_page(
+			'noor-tms',
+			__( 'Run Seeder', 'noor-tms' ),
+			__( 'Run Seeder', 'noor-tms' ),
+			'noor_tms_manage',
+			'noor-tms-seed',
+			[ $this->seed, 'page_seed' ]
 		);
 
 		add_submenu_page(
@@ -189,6 +200,7 @@ class Admin {
 			'noor-tms_page_noor-tms-classes',
 			'noor-tms_page_noor-tms-categories',
 			'noor-tms_page_noor-tms-settings',
+			'noor-tms_page_noor-tms-seed',
 			'noor-tms_page_noor-tms-teachers',
 			'noor-tms_page_noor-tms-attendance',
 			'noor-tms_page_noor-tms-teacher-attendance',
