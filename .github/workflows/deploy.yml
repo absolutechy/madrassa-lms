@@ -19,13 +19,11 @@ jobs:
       - name: Deploy via lftp
         run: |
           lftp -c "
-            set ssl:verify-certificate no;
-            set ftp:ssl-force true;
-            set ftp:ssl-protect-data true;
+            set ftp:ssl-allow false;
             set net:timeout 30;
             set net:max-retries 3;
             set net:reconnect-interval-base 5;
-            open -u '${{ secrets.FTP_USERNAME }}','${{ secrets.FTP_PASSWORD }}' ftps://${{ secrets.FTP_HOST }};
+            open -u '${{ secrets.FTP_USERNAME }}','${{ secrets.FTP_PASSWORD }}' ftp://${{ secrets.FTP_HOST }};
             mirror --reverse --delete --verbose \
               --exclude='^\.git/' \
               --exclude='^\.github/' \
