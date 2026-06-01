@@ -21,7 +21,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }}
           local-dir: ./          # Root of your plugin repo
-          server-dir: /public_html/wp-content/plugins/madrassa-lms/
+          server-dir: public_html/wp-content/plugins/madrassa-lms/
           exclude: |
             **/.git*
             **/.git*/**
