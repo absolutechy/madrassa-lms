@@ -184,5 +184,6 @@ final class Plugin {
 		if ( version_compare( $installed, '10.1', '<' ) ) {
 			DatabaseHandler::create_tables();
 		}
+		Roles::sync_caps();
 	}
 }
