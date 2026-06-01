@@ -91,10 +91,12 @@ class PublicController {
 		$public_css_ver  = file_exists( $public_css_path ) ? (string) filemtime( $public_css_path ) : \NOOR_TMS_VERSION;
 		$public_js_ver   = file_exists( $public_js_path ) ? (string) filemtime( $public_js_path ) : \NOOR_TMS_VERSION;
 
+		noor_tms_enqueue_font();
+
 		wp_enqueue_style(
 			'noor-tms-public',
 			NOOR_TMS_PLUGIN_URL . 'public/css/noor-tms-public.css',
-			[],
+			[ 'noor-tms-jameel-noori-kasheeda' ],
 			$public_css_ver
 		);
 

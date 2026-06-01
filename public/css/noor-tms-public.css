@@ -4,10 +4,16 @@
  * conflicting with the active WordPress theme.
  */
 
+.noor-tms-app,
+.noor-tms-login-wrap {
+	font-family: var(--tms-font-family);
+}
+
 /* =========================================================================
    CSS Custom Properties
    ========================================================================= */
 :root {
+	--tms-font-family:   'JameelNooriNastaliqKashida', 'Jameel Noori Nastaleeq Kasheeda', serif;
 	--tms-primary:       #1e3a5f;
 	--tms-primary-dark:  #152c47;
 	--tms-accent:        #25a05c;

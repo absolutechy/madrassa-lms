@@ -28,6 +28,8 @@ define( 'NOOR_TMS_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'NOOR_TMS_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'NOOR_TMS_PLUGIN_BASE', plugin_basename( __FILE__ ) );
 
+require_once NOOR_TMS_PLUGIN_DIR . 'includes/noor-tms-font.php';
+
 // ---------------------------------------------------------------------------
 // Autoloader  (PSR-4 style for the Noor_TMS namespace)
 // ---------------------------------------------------------------------------

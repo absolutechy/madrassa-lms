@@ -114,6 +114,10 @@ final class Plugin {
 
 		$this->loader->add_action( 'init',               $public, 'register_shortcodes' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $public, 'enqueue_assets' );
+		// Enqueue global web font for entire site (late priority beats theme CSS).
+		$this->loader->add_action( 'wp_enqueue_scripts', $this, 'enqueue_global_font', 999 );
+		$this->loader->add_action( 'admin_enqueue_scripts', $this, 'enqueue_global_font', 999 );
+		$this->loader->add_action( 'login_enqueue_scripts', $this, 'enqueue_global_font', 999 );
 		$this->loader->add_action( 'template_redirect',  $public, 'handle_early_requests' );
 		$this->loader->add_filter( 'login_redirect',     $public, 'redirect_after_login', 10, 3 );
 		$this->loader->add_action( 'wp_ajax_noor_tms_submit_support_request',        $public, 'ajax_submit_support_request' );
@@ -152,6 +156,13 @@ final class Plugin {
 	 */
 	public function run(): void {
 		$this->loader->run();
+	}
+
+	/**
+	 * Enqueue Jameel Noori Nastaleeq Kasheeda site-wide.
+	 */
+	public function enqueue_global_font(): void {
+		noor_tms_enqueue_font();
 	}
 
 	/**

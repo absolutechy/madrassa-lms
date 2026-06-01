@@ -213,10 +213,12 @@ class Admin {
 			return;
 		}
 
+		noor_tms_enqueue_font();
+
 		wp_enqueue_style(
 			'noor-tms-admin',
 			NOOR_TMS_PLUGIN_URL . 'admin/css/noor-tms-admin.css',
-			[],
+			[ 'noor-tms-jameel-noori-kasheeda' ],
 			NOOR_TMS_VERSION
 		);
 
