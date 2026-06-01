@@ -48,6 +48,8 @@ function noor_tms_enqueue_font(): void {
 	}
 	:root {
 		--tms-font-family: \"{$family}\", \"Jameel Noori Nastaleeq Kasheeda\", serif;
+		--tms-min-font-size: 18px;
+		--tms-word-spacing: 5px;
 	}
 	html,
 	body,
@@ -56,10 +58,21 @@ function noor_tms_enqueue_font(): void {
 	#wpwrap,
 	#wpbody-content {
 		font-family: var(--tms-font-family) !important;
+		font-size: var(--tms-min-font-size) !important;
+		word-spacing: var(--tms-word-spacing) !important;
 	}
 	.noor-tms-app *,
-	.noor-tms-login-wrap * {
+	.noor-tms-login-wrap *,
+	#wpbody-content * {
 		font-family: inherit;
+		word-spacing: inherit;
+	}
+	body :where(p, a, span, li, td, th, label, input, textarea, select, button, small),
+	.noor-tms-app :where(p, a, span, li, td, th, label, input, textarea, select, button, small),
+	.noor-tms-login-wrap :where(p, a, span, li, td, th, label, input, textarea, select, button, small),
+	#wpbody-content :where(p, a, span, li, td, th, label, input, textarea, select, button, small) {
+		font-size: max(var(--tms-min-font-size), 1em) !important;
+		word-spacing: var(--tms-word-spacing) !important;
 	}
 	.dashicons,
 	.dashicons:before,
@@ -73,6 +86,8 @@ function noor_tms_enqueue_font(): void {
 	select,
 	button {
 		font-family: inherit !important;
+		font-size: max(var(--tms-min-font-size), 1em) !important;
+		word-spacing: var(--tms-word-spacing) !important;
 	}";
 
 	wp_add_inline_style( $handle, $css );

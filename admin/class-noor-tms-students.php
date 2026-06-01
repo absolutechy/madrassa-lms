@@ -578,6 +578,28 @@ class Students {
 		$month_name    = wp_date( 'F', mktime( 0, 0, 0, $month, 1, $year ) );
 		$generated_on  = current_time( 'mysql' );
 		$student_photo = ! empty( $student['photo_id'] ) ? wp_get_attachment_image_url( (int) $student['photo_id'], 'medium' ) : '';
+		$category      = ! empty( $student['category_id'] ) ? DatabaseHandler::get_category( (int) $student['category_id'] ) : null;
+		$subcategory   = ! empty( $student['subcategory_id'] ) ? DatabaseHandler::get_category( (int) $student['subcategory_id'] ) : null;
+
+		if ( ! $subcategory && ! empty( $student['sub_category_id'] ) ) {
+			$subcategory = DatabaseHandler::get_category( (int) $student['sub_category_id'] );
+		}
+
+		$student_profile_fields = [
+			__( 'Serial Number', 'noor-tms' )   => $student['serial_number'] ?? null,
+			__( 'Full Name', 'noor-tms' )       => $student['name'] ?? '',
+			__( "Father's Name", 'noor-tms' )   => $student['father_name'] ?? null,
+			__( 'Parent Phone', 'noor-tms' )    => $student['parent_phone'] ?? '',
+			__( 'Gender', 'noor-tms' )          => ! empty( $student['gender'] ) ? ucfirst( (string) $student['gender'] ) : null,
+			__( 'Account', 'noor-tms' )         => ! empty( $student['account_type'] ) ? ucfirst( (string) $student['account_type'] ) : null,
+			__( 'Category', 'noor-tms' )        => $category['name'] ?? ( $student['category'] ?? null ),
+			__( 'Sub-category', 'noor-tms' )    => $subcategory['name'] ?? null,
+			__( 'Class', 'noor-tms' )           => $student['class_name'] ?? __( 'Unassigned', 'noor-tms' ),
+			__( 'Date of Birth', 'noor-tms' )   => $student['dob'] ?? null,
+			__( 'Enrollment Date', 'noor-tms' ) => $student['enrollment_date'] ?? '',
+			__( 'Status', 'noor-tms' )          => ! empty( $student['status'] ) ? ucfirst( (string) $student['status'] ) : null,
+			__( 'Address', 'noor-tms' )         => $student['address'] ?? null,
+		];
 
 		$total_obtained = 0.0;
 		$total_marks    = 0.0;
@@ -598,6 +620,14 @@ class Students {
 			<meta name="viewport" content="width=device-width, initial-scale=1">
 			<title><?php echo esc_html( sprintf( __( 'Student Report - %s', 'noor-tms' ), (string) ( $student['name'] ?? '' ) ) ); ?></title>
 			<style>
+				@font-face {
+					font-family: "JameelNooriNastaliqKashida";
+					font-style: normal;
+					font-weight: 400;
+					font-display: swap;
+					src: url("https://cdn.jsdelivr.net/npm/jameel-noori-nastaliq-kasheeda@1.1.0/fonts/JameelNooriNastaliqKasheeda3.woff2") format("woff2");
+				}
+
 				:root {
 					--noor-bg: #f3f6fb;
 					--noor-paper: #ffffff;
@@ -605,48 +635,72 @@ class Students {
 					--noor-muted: #6b7280;
 					--noor-border: #dbe3ef;
 					--noor-primary: #0f766e;
+					--noor-primary-dark: #0b5f59;
+					--noor-font: "JameelNooriNastaliqKashida", "Jameel Noori Nastaleeq Kasheeda", serif;
+					--noor-min-font-size: 18px;
+					--noor-word-spacing: 5px;
 				}
 
-				* { box-sizing: border-box; }
+				* {
+					box-sizing: border-box;
+				}
 
 				body {
 					margin: 0;
 					padding: 24px;
-						<select id="category_id" name="category_id" class="regular-text" data-selected="<?php echo esc_attr( (string) ( $student['category_id'] ?? 0 ) ); ?>">
-							<option value="0"><?php esc_html_e( 'Loading categories…', 'noor-tms' ); ?></option>
-						</select>
+					background: var(--noor-bg);
+					color: var(--noor-text);
+					font-family: var(--noor-font);
+					font-size: var(--noor-min-font-size);
+					line-height: 1.55;
+					word-spacing: var(--noor-word-spacing);
+				}
+
+				.report-shell {
+					max-width: 960px;
+					margin: 0 auto;
+				}
+
+				.report-toolbar {
+					display: flex;
+					justify-content: space-between;
+					gap: 12px;
+					align-items: center;
+					margin-bottom: 16px;
+					padding: 12px;
 					background: #f9fbff;
+					border: 1px solid var(--noor-border);
 					border-radius: 12px;
 					flex-wrap: wrap;
 				}
 
-				.report-filters {
+				.report-filters,
+				.report-actions {
 					display: flex;
-						<select id="subcategory_id" name="subcategory_id" class="regular-text" data-selected="<?php echo esc_attr( (string) ( $student['subcategory_id'] ?? 0 ) ); ?>" disabled>
-							<option value="0"><?php esc_html_e( 'Select a category first', 'noor-tms' ); ?></option>
+					align-items: center;
+					gap: 8px;
+					flex-wrap: wrap;
+				}
+
+				.report-filters label {
+					color: var(--noor-muted);
+					font-size: var(--noor-min-font-size);
+					font-weight: 600;
+				}
 
 				.report-filters select,
 				.report-filters button,
 				.report-actions button,
-				<tr>
-					<th scope="row">
-						<label for="class_id"><?php esc_html_e( 'Class', 'noor-tms' ); ?></label>
-					</th>
-					<td>
-						<select id="class_id" name="class_id" class="regular-text" data-selected="<?php echo esc_attr( (string) ( $student['class_id'] ?? 0 ) ); ?>" disabled>
-							<option value="0"><?php esc_html_e( 'Select a sub-category first', 'noor-tms' ); ?></option>
-						</select>
-						<p class="description"><?php esc_html_e( 'Shown only for school-type categories.', 'noor-tms' ); ?></p>
-					</td>
-				</tr>
 				.report-actions a {
-					height: 34px;
+					min-height: 34px;
 					border-radius: 8px;
 					border: 1px solid #b8c7dd;
-					padding: 0 12px;
+					padding: 6px 12px;
 					background: #fff;
-					color: #1f2937;
-					font-size: 13px;
+					color: var(--noor-text);
+					font: inherit;
+					font-size: var(--noor-min-font-size);
+					word-spacing: var(--noor-word-spacing);
 					text-decoration: none;
 					cursor: pointer;
 				}
@@ -658,9 +712,10 @@ class Students {
 					color: #fff;
 				}
 
-				.report-actions {
-					display: flex;
-					gap: 8px;
+				.report-filters button:hover,
+				.report-actions .button-primary:hover {
+					background: var(--noor-primary-dark);
+					border-color: var(--noor-primary-dark);
 				}
 
 				.report-paper {
@@ -680,6 +735,21 @@ class Students {
 					border-bottom: 2px solid #edf2fb;
 				}
 
+				.institute-name {
+					margin: 0;
+					color: var(--noor-primary);
+					direction: rtl;
+					font-size: 34px;
+					line-height: 1.35;
+					text-align: right;
+				}
+
+				.institute-contact {
+					color: var(--noor-muted);
+					font-size: var(--noor-min-font-size);
+					line-height: 1.6;
+				}
+
 				.report-title {
 					margin: 0;
 					font-size: 28px;
@@ -687,18 +757,20 @@ class Students {
 				}
 
 				.report-meta {
-					font-size: 13px;
+					font-size: var(--noor-min-font-size);
 					color: var(--noor-muted);
 					text-align: right;
 				}
 
 				.section {
 					margin-top: 18px;
+					break-inside: avoid;
 				}
 
 				.section h2 {
 					margin: 0 0 10px;
-					font-size: 17px;
+					font-size: var(--noor-min-font-size);
+					color: var(--noor-primary);
 				}
 
 				.profile-layout {
@@ -731,7 +803,7 @@ class Students {
 
 				.field small {
 					display: block;
-					font-size: 11px;
+					font-size: var(--noor-min-font-size);
 					color: var(--noor-muted);
 					text-transform: uppercase;
 					letter-spacing: 0.04em;
@@ -740,7 +812,8 @@ class Students {
 				table {
 					width: 100%;
 					border-collapse: collapse;
-					font-size: 13px;
+					font-size: var(--noor-min-font-size);
+					background: #fff;
 				}
 
 				th,
@@ -748,6 +821,7 @@ class Students {
 					border: 1px solid var(--noor-border);
 					padding: 8px 10px;
 					text-align: left;
+					vertical-align: top;
 				}
 
 				th {
@@ -774,14 +848,32 @@ class Students {
 				}
 
 				@media print {
-					body { padding: 0; background: #fff; }
-					.no-print { display: none !important; }
+					body {
+						padding: 0;
+						background: #fff;
+						color: #000;
+					}
+
+					.no-print {
+						display: none !important;
+					}
+
+					.report-shell {
+						max-width: none;
+						margin: 0;
+					}
+
 					.report-paper {
 						border: 0;
 						box-shadow: none;
 						border-radius: 0;
 						padding: 0;
 					}
+
+					.section {
+						break-inside: avoid;
+					}
+
 					@page {
 						size: A4;
 						margin: 12mm;
@@ -792,175 +884,20 @@ class Students {
 		<body>
 			<div class="report-shell">
 				<div class="report-toolbar no-print">
-					<form method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="report-filters">
-						<input type="hidden" name="action" value="noor_tms_print_student" />
-						<input type="hidden" name="student_id" value="<?php echo esc_attr( $student_id ); ?>" />
-						<input type="hidden" name="_wpnonce" value="<?php echo esc_attr( wp_create_nonce( 'noor_tms_print_student_' . $student_id ) ); ?>" />
-
-						<label for="noor-print-month"><?php esc_html_e( 'Month', 'noor-tms' ); ?></label>
-						<select id="noor-print-month" name="month">
-							<?php for ( $m = 1; $m <= 12; $m++ ) : ?>
-								<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $month, $m ); ?>>
-									<?php echo esc_html( wp_date( 'F', mktime( 0, 0, 0, $m, 1, max( 2000, $year ) ) ) ); ?>
-								</option>
-							<?php endfor; ?>
-						</select>
-
-						<label for="noor-print-year"><?php esc_html_e( 'Year', 'noor-tms' ); ?></label>
-						<select id="noor-print-year" name="year">
-							<?php for ( $y = $year_start; $y <= $year_end; $y++ ) : ?>
-								<option value="<?php echo esc_attr( $y ); ?>" <?php selected( $year, $y ); ?>>
-									<?php echo esc_html( $y ); ?>
-								</option>
-							<?php endfor; ?>
-						</select>
-
-						<button type="submit"><?php esc_html_e( 'Update', 'noor-tms' ); ?></button>
-					</form>
-					<script>
-					(function() {
-						const category = document.getElementById('category_id');
-						const subcategory = document.getElementById('subcategory_id');
-						const classGroup = document.getElementById('class_id');
-						if (!category || !subcategory || !classGroup || !window.noorTMS) return;
-
-						const selectedCategory = parseInt(category.dataset.selected || '0', 10) || 0;
-						const selectedSubcategory = parseInt(subcategory.dataset.selected || '0', 10) || 0;
-						const selectedClass = parseInt(classGroup.dataset.selected || '0', 10) || 0;
-						let categoryMap = {};
-						let subcategoryMap = {};
-
-						function post(action, data) {
-							const payload = Object.assign({ action: action, nonce: noorTMS.nonce }, data || {});
-							const body = Object.keys(payload).map(function(key) {
-								return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
-							}).join('&');
-							return fetch(noorTMS.ajaxUrl, {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-								body: body
-							}).then(response => response.json());
-						}
-
-						function renderOptions(select, rows, placeholder) {
-							select.innerHTML = '';
-							const first = document.createElement('option');
-							first.value = '0';
-							first.textContent = placeholder;
-							select.appendChild(first);
-							rows.forEach(row => {
-								const option = document.createElement('option');
-								option.value = String(row.id);
-								option.textContent = row.name;
-								select.appendChild(option);
-							});
-						}
-
-						async function loadCategories() {
-							const response = await post('noor_tms_get_categories', {});
-							const rows = (response && response.success && response.data && response.data.categories) ? response.data.categories : [];
-							categoryMap = {};
-							rows.forEach(row => { categoryMap[String(row.id)] = row; });
-							renderOptions(category, rows, '<?php echo esc_js( __( '— Select Category —', 'noor-tms' ) ); ?>');
-							category.disabled = false;
-							if (selectedCategory && category.querySelector('option[value="' + selectedCategory + '"]')) {
-								category.value = String(selectedCategory);
-							}
-						}
-
-						async function loadSubcategories(parentId, preferredSubcategory) {
-							const response = await post('noor_tms_get_subcategories', { parent_id: parentId });
-							const rows = (response && response.success && response.data && response.data.subcategories) ? response.data.subcategories : [];
-							subcategoryMap = {};
-							rows.forEach(row => { subcategoryMap[String(row.id)] = row; });
-							renderOptions(subcategory, rows, '<?php echo esc_js( __( '— Select Sub-Category —', 'noor-tms' ) ); ?>');
-							subcategory.disabled = !rows.length;
-							if (preferredSubcategory && subcategory.querySelector('option[value="' + preferredSubcategory + '"]')) {
-								subcategory.value = String(preferredSubcategory);
-							}
-						}
-
-						async function loadClasses(subcategoryId, preferredClass) {
-							const response = await post('noor_tms_get_classes', { subcategory_id: subcategoryId });
-							const rows = (response && response.success && response.data && response.data.classes) ? response.data.classes : [];
-							renderOptions(classGroup, rows, '<?php echo esc_js( __( '— Select Class —', 'noor-tms' ) ); ?>');
-							classGroup.disabled = !rows.length;
-							if (preferredClass && classGroup.querySelector('option[value="' + preferredClass + '"]')) {
-								classGroup.value = String(preferredClass);
-							}
-						}
-
-						function syncVisibility() {
-							const cat = categoryMap[String(category.value)] || null;
-							const sub = subcategoryMap[String(subcategory.value)] || null;
-							const isSchool = cat ? !!parseInt(cat.is_school_type || '0', 10) : false;
-							if (!isSchool) {
-								classGroup.value = '0';
-								classGroup.disabled = true;
-								return;
-							}
-							if (sub) {
-								classGroup.disabled = false;
-							}
-						}
-
-						category.addEventListener('change', async function() {
-							await loadSubcategories(category.value, 0);
-							subcategory.value = '0';
-							await loadClasses(0, 0);
-							syncVisibility();
-						});
-
-						subcategory.addEventListener('change', async function() {
-							const cat = categoryMap[String(category.value)] || null;
-							if (!cat || !parseInt(cat.is_school_type || '0', 10)) {
-								classGroup.value = '0';
-								classGroup.disabled = true;
-								return;
-							}
-							await loadClasses(subcategory.value, 0);
-							syncVisibility();
-						});
-
-						(async function init() {
-							await loadCategories();
-							if (selectedCategory) {
-								await loadSubcategories(selectedCategory, selectedSubcategory);
-								if (selectedSubcategory) {
-									await loadClasses(selectedSubcategory, selectedClass);
-								}
-							}
-							syncVisibility();
-						})();
-					})();
-					</script>
-
 					<div class="report-actions">
 						<button type="button" class="button-primary" onclick="window.print();"><?php esc_html_e( 'Print', 'noor-tms' ); ?></button>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=noor-tms' ) ); ?>"><?php esc_html_e( 'Close', 'noor-tms' ); ?></a>
 					</div>
 				</div>
 
 				<div class="report-paper">
 					<header class="report-header">
-						<div>
-							<h1 class="report-title"><?php esc_html_e( 'Student Report', 'noor-tms' ); ?></h1>
-							<p style="margin:4px 0 0;color:#6b7280;">
-								<?php
-								echo esc_html(
-									sprintf(
-										/* translators: 1: month name, 2: year */
-										__( 'Attendance period: %1$s %2$d', 'noor-tms' ),
-										$month_name,
-										$year
-									)
-								);
-								?>
-							</p>
+						<div class="institute-contact">
+							<div><strong><?php esc_html_e( 'Institute Email:', 'noor-tms' ); ?></strong> info@ibneabbas.com</div>
+							<div><strong><?php esc_html_e( 'Contact Num:', 'noor-tms' ); ?></strong> 033398234444</div>
+							<div><strong><?php esc_html_e( 'Address:', 'noor-tms' ); ?></strong> Dummy address for now</div>
 						</div>
-						<div class="report-meta">
-							<div><?php echo esc_html( sprintf( __( 'Generated: %s', 'noor-tms' ), $generated_on ) ); ?></div>
-							<div><?php echo esc_html( sprintf( __( 'Student ID: %d', 'noor-tms' ), $student_id ) ); ?></div>
+						<div>
+							<h1 class="institute-name" lang="ur" dir="rtl">جامعہ عبداللہ ابن عباس</h1>
 						</div>
 					</header>
 
@@ -973,104 +910,25 @@ class Students {
 								<?php endif; ?>
 							</div>
 							<div class="profile-grid">
-								<div class="field">
-									<small><?php esc_html_e( 'Full Name', 'noor-tms' ); ?></small>
-									<?php echo esc_html( (string) ( $student['name'] ?? '' ) ); ?>
-								</div>
-								<div class="field">
-									<small><?php esc_html_e( 'Class', 'noor-tms' ); ?></small>
-									<?php echo esc_html( (string) ( $student['class_name'] ?? __( 'Unassigned', 'noor-tms' ) ) ); ?>
-								</div>
-								<div class="field">
-									<small><?php esc_html_e( "Parent's WhatsApp", 'noor-tms' ); ?></small>
-									<?php echo esc_html( (string) ( $student['parent_phone'] ?? '-' ) ); ?>
-								</div>
-								<div class="field">
-									<small><?php esc_html_e( 'Enrollment Date', 'noor-tms' ); ?></small>
-									<?php echo esc_html( (string) ( $student['enrollment_date'] ?? '-' ) ); ?>
-								</div>
-								<div class="field">
-									<small><?php esc_html_e( 'Status', 'noor-tms' ); ?></small>
-									<?php echo esc_html( ucfirst( (string) ( $student['status'] ?? 'active' ) ) ); ?>
-								</div>
+								<?php foreach ( $student_profile_fields as $label => $value ) : ?>
+									<?php
+									if ( null === $value || '' === $value ) {
+										continue;
+									}
+									?>
+									<div class="field">
+										<small><?php echo esc_html( (string) $label ); ?></small>
+										<?php echo esc_html( (string) $value ); ?>
+									</div>
+								<?php endforeach; ?>
 							</div>
 						</div>
 					</section>
 
-					<section class="section">
-						<h2><?php esc_html_e( 'Exam Results', 'noor-tms' ); ?></h2>
-						<?php if ( empty( $results ) ) : ?>
-							<p class="alert"><?php esc_html_e( 'No exam results found for this student.', 'noor-tms' ); ?></p>
-						<?php else : ?>
-							<table>
-								<thead>
-									<tr>
-										<th><?php esc_html_e( 'Subject', 'noor-tms' ); ?></th>
-										<th><?php esc_html_e( 'Marks', 'noor-tms' ); ?></th>
-										<th><?php esc_html_e( 'Percentage', 'noor-tms' ); ?></th>
-										<th><?php esc_html_e( 'Exam Date', 'noor-tms' ); ?></th>
-									</tr>
-								</thead>
-								<tbody>
-									<?php foreach ( $results as $result_row ) : ?>
-										<?php
-										$obtained   = (float) ( $result_row['marks_obtained'] ?? 0 );
-										$total      = (float) ( $result_row['total_marks'] ?? 0 );
-										$result_pct = $total > 0 ? ( $obtained / $total ) * 100 : 0;
-										?>
-										<tr>
-											<td><?php echo esc_html( (string) ( $result_row['subject'] ?? '' ) ); ?></td>
-											<td><?php echo esc_html( sprintf( '%s / %s', number_format_i18n( $obtained, 2 ), number_format_i18n( $total, 2 ) ) ); ?></td>
-											<td><?php echo esc_html( number_format_i18n( $result_pct, 2 ) . '%' ); ?></td>
-											<td><?php echo esc_html( (string) ( $result_row['exam_date'] ?? '-' ) ); ?></td>
-										</tr>
-									<?php endforeach; ?>
-								</tbody>
-							</table>
-							<div style="margin-top:10px;" class="summary-grid">
-								<div class="field">
-									<small><?php esc_html_e( 'Total Obtained', 'noor-tms' ); ?></small>
-									<?php echo esc_html( number_format_i18n( $total_obtained, 2 ) ); ?>
-								</div>
-								<div class="field">
-									<small><?php esc_html_e( 'Overall Percentage', 'noor-tms' ); ?></small>
-									<?php echo esc_html( number_format_i18n( $overall_pct, 2 ) . '%' ); ?>
-								</div>
-							</div>
-						<?php endif; ?>
-					</section>
-
-					<section class="section">
-						<h2><?php esc_html_e( 'Attendance Summary', 'noor-tms' ); ?></h2>
-						<?php if ( empty( $attendance ) ) : ?>
-							<p class="alert"><?php esc_html_e( 'No attendance records found for the selected month.', 'noor-tms' ); ?></p>
-						<?php else : ?>
-							<div class="summary-grid">
-								<div class="field"><small><?php esc_html_e( 'Present', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['present'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Absent', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['absent'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Late', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['late'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Excused', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['excused'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Total Days', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $attendance['total_days'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Attendance %', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $attendance['pct'] ?? 0 ), 2 ) . '%' ); ?></div>
-							</div>
-						<?php endif; ?>
-					</section>
-
-					<section class="section">
-						<h2><?php esc_html_e( 'Fee Summary', 'noor-tms' ); ?></h2>
-						<?php if ( (int) ( $fee_summary['invoice_count'] ?? 0 ) === 0 ) : ?>
-							<p class="alert"><?php esc_html_e( 'No fee records found for this student.', 'noor-tms' ); ?></p>
-						<?php else : ?>
-							<div class="summary-grid">
-								<div class="field"><small><?php esc_html_e( 'Total Due', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['total_due'] ?? 0 ), 2 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Total Paid', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['total_paid'] ?? 0 ), 2 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Balance', 'noor-tms' ); ?></small><?php echo esc_html( number_format_i18n( (float) ( $fee_summary['balance'] ?? 0 ), 2 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Invoices', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $fee_summary['invoice_count'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Paid Invoices', 'noor-tms' ); ?></small><?php echo esc_html( (int) ( $fee_summary['paid_count'] ?? 0 ) ); ?></div>
-								<div class="field"><small><?php esc_html_e( 'Partial/Unpaid', 'noor-tms' ); ?></small><?php echo esc_html( ( (int) ( $fee_summary['partial_count'] ?? 0 ) + (int) ( $fee_summary['unpaid_count'] ?? 0 ) ) ); ?></div>
-							</div>
-						<?php endif; ?>
-					</section>
+					<?php
+					// Results, attendance, and fees are intentionally hidden from the student PDF for now.
+					// Restore these sections later when the updated report layout is finalized.
+					?>
 				</div>
 			</div>
 		</body>
